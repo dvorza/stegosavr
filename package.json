@@ -1,0 +1,24 @@
+{
+  "name": "stegosavr",
+  "version": "1.0.0",
+  "description": "A small vanilla TypeScript single page app.",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com-dvorza:dvorza/stegosavr.git"
+  },
+  "license": "ISC",
+  "author": "",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16",
+    "vitest": "^4.1.9"
+  }
+}
