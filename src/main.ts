@@ -1,6 +1,7 @@
 import "./styles.css";
 import { copyText } from "./clipboard";
 import { createKeyPair, decryptStoredMessage, encryptForRecipient } from "./crypto";
+import { formatPublicKey, listPublicKeyDisplayFormats } from "./mnemonic/public-key";
 import { readStoredKeyPair, saveStoredKeyPair, type StoredKeyPair } from "./storage";
 
 type Tab = "key" | "encrypt" | "decrypt";
@@ -9,6 +10,7 @@ interface AppState {
   activeTab: Tab;
   storedKeyPair: StoredKeyPair | null;
   keyMessage: string;
+  publicKeyFormat: string;
   encryptError: string;
   encryptedMessage: string;
   decryptError: string;
@@ -27,6 +29,7 @@ const state: AppState = {
   activeTab: "key",
   storedKeyPair: readStoredKeyPair(),
   keyMessage: "",
+  publicKeyFormat: "raw",
   encryptError: "",
   encryptedMessage: "",
   decryptError: "",
@@ -115,7 +118,13 @@ function renderKeyTab(): string {
         Share this public key with someone who wants to encrypt a message for you.
         Key replacement, private-key export, and private-key import are intentionally unavailable in this MVP.
       </p>
-      <textarea readonly rows="6">${escapeHtml(state.storedKeyPair.publicKey)}</textarea>
+      <label>
+        Public key format
+        <select name="publicKeyFormat" data-public-key-format>
+          ${renderPublicKeyFormatOptions()}
+        </select>
+      </label>
+      <textarea readonly rows="8">${escapeHtml(getSelectedPublicKeyRepresentation())}</textarea>
       <div class="actions">
         <button type="button" data-copy="public-key">Copy public key</button>
       </div>
@@ -218,12 +227,33 @@ function bindActiveTab(): void {
   app.querySelector<HTMLFormElement>('[data-form="key"]')?.addEventListener("submit", handleKeySubmit);
   app.querySelector<HTMLFormElement>('[data-form="encrypt"]')?.addEventListener("submit", handleEncryptSubmit);
   app.querySelector<HTMLFormElement>('[data-form="decrypt"]')?.addEventListener("submit", handleDecryptSubmit);
+  app.querySelector<HTMLSelectElement>("[data-public-key-format]")?.addEventListener("change", handlePublicKeyFormatChange);
   app.querySelector<HTMLButtonElement>('[data-copy="public-key"]')?.addEventListener("click", () => {
-    void handleCopy(state.storedKeyPair?.publicKey ?? "", "Public key copied.");
+    void handleCopy(getSelectedPublicKeyRepresentation(), "Public key copied.");
   });
   app.querySelector<HTMLButtonElement>('[data-copy="encrypted-message"]')?.addEventListener("click", () => {
     void handleCopy(state.encryptedMessage, "Encrypted message copied.");
   });
+}
+
+function renderPublicKeyFormatOptions(): string {
+  return listPublicKeyDisplayFormats()
+    .map(
+      (format) => `
+        <option value="${format.id}" ${state.publicKeyFormat === format.id ? "selected" : ""}>
+          ${format.label}
+        </option>
+      `,
+    )
+    .join("");
+}
+
+function getSelectedPublicKeyRepresentation(): string {
+  if (!state.storedKeyPair) {
+    return "";
+  }
+
+  return formatPublicKey(state.storedKeyPair.publicKey, state.publicKeyFormat);
 }
 
 async function handleKeySubmit(event: SubmitEvent): Promise<void> {
@@ -275,9 +305,16 @@ async function handleEncryptSubmit(event: SubmitEvent): Promise<void> {
   try {
     state.encryptedMessage = await encryptForRecipient({ recipientPublicKey, plaintext });
   } catch {
-    state.encryptError = "Encryption failed. Check that the recipient public key is valid.";
+    state.encryptError = "Encryption failed. The recipient public key could not be decoded.";
   }
 
+  render();
+}
+
+function handlePublicKeyFormatChange(event: Event): void {
+  const select = event.currentTarget as HTMLSelectElement;
+  state.publicKeyFormat = select.value;
+  state.keyMessage = "";
   render();
 }
 

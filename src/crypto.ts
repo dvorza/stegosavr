@@ -3,6 +3,7 @@ import initCrypto, {
   encryptMessage,
   generateKeyPair,
 } from "./wasm/stegosavr_crypto";
+import { normalizePublicKeyInput } from "./mnemonic/public-key";
 import { getRandomBytes } from "./random";
 
 const KEY_RANDOM_BYTES = 32;
@@ -46,8 +47,10 @@ export async function createKeyPair(passphrase: string): Promise<GeneratedKeyPai
 
 export async function encryptForRecipient(request: EncryptRequest): Promise<string> {
   await ensureCryptoReady();
+  const recipientPublicKey = normalizePublicKeyInput(request.recipientPublicKey);
+
   return encryptMessage(
-    request.recipientPublicKey,
+    recipientPublicKey,
     request.plaintext,
     getRandomBytes(KEY_RANDOM_BYTES),
     getRandomBytes(NONCE_RANDOM_BYTES),

@@ -7,9 +7,30 @@ The app lets a user:
 
 - generate a local key pair protected by a passphrase;
 - store the public key and protected private key in browser `localStorage`;
-- copy the public key and share it out of band;
-- encrypt a text message for another user's Stegosavr public key;
+- copy the public key as a raw key, standard mnemonic phrase, or vegetables mnemonic phrase;
+- encrypt a text message for another user's raw or mnemonic Stegosavr public key;
 - decrypt a Stegosavr encrypted message with the stored private key and passphrase.
+
+## Public Key Formats
+
+The raw `STEGOSAVR-PUBLIC:v1` public key remains the canonical format. The key
+page also offers reversible mnemonic display formats that encode the same public
+key bytes with fixed word and emoji slots:
+
+```txt
+🔐 standard:v1
+quiet-blue quiet-green mango-field 🌙🌙 🌙🧭 🌙✨
+...
+```
+
+Built-in dictionary profiles:
+
+- `standard`: neutral words and emoji.
+- `vegetables`: vegetables and garden themed words and emoji.
+
+The encrypt page accepts either a raw public key or a supported mnemonic phrase.
+Mnemonic phrases include a checksum, so mistyped or corrupted phrases are rejected
+before encryption.
 
 ## Security Model
 

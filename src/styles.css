@@ -21,6 +21,7 @@ body {
 
 button,
 input,
+select,
 textarea {
   font: inherit;
 }
@@ -47,6 +48,7 @@ textarea:focus-visible {
 }
 
 input,
+select,
 textarea {
   border: 1px solid #c9d7c3;
   border-radius: 8px;
