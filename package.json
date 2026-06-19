@@ -14,7 +14,7 @@
     "build": "npm run build:wasm && tsc && vite build",
     "build:wasm": "wasm-pack build wasm-crypto --target web --out-dir ../src/wasm --release",
     "preview": "vite preview",
-    "test": "npm run test:wasm && vitest run",
+    "test": "npm run test:wasm && npm run build:wasm && vitest run",
     "test:wasm": "cargo test --manifest-path wasm-crypto/Cargo.toml",
     "test:watch": "vitest"
   },
