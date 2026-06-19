@@ -1,6 +1,6 @@
 :root {
   color: #172018;
-  background: #f5f7ef;
+  background: #f6f8f2;
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
@@ -19,15 +19,19 @@ body {
   margin: 0;
 }
 
+button,
+input,
+textarea {
+  font: inherit;
+}
+
 button {
   border: 0;
   border-radius: 8px;
   background: #244d36;
   color: #ffffff;
   cursor: pointer;
-  font: inherit;
   font-weight: 700;
-  min-width: 3rem;
   padding: 0.75rem 1rem;
 }
 
@@ -35,23 +39,41 @@ button:hover {
   background: #1b3c2a;
 }
 
-button:focus-visible {
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
   outline: 3px solid #8bcf9f;
   outline-offset: 3px;
 }
 
+input,
+textarea {
+  border: 1px solid #c9d7c3;
+  border-radius: 8px;
+  color: #172018;
+  margin-top: 0.4rem;
+  padding: 0.75rem;
+  width: 100%;
+}
+
+textarea {
+  min-height: 7rem;
+  resize: vertical;
+}
+
 .app-shell {
-  align-items: center;
-  display: flex;
   min-height: 100vh;
   padding: 1.5rem;
 }
 
-.counter {
+.app-panel {
   margin: 0 auto;
-  max-width: 34rem;
-  text-align: center;
+  max-width: 58rem;
   width: 100%;
+}
+
+.hero {
+  padding: 2rem 0 1.5rem;
 }
 
 .eyebrow {
@@ -63,23 +85,112 @@ button:focus-visible {
   text-transform: uppercase;
 }
 
+h1,
+h2,
+h3,
+p {
+  margin-top: 0;
+}
+
 h1 {
-  font-size: clamp(2.5rem, 10vw, 5.5rem);
+  font-size: clamp(2.6rem, 8vw, 5rem);
   line-height: 1;
+  margin-bottom: 1rem;
+}
+
+h2 {
+  font-size: clamp(1.6rem, 4vw, 2.5rem);
+  line-height: 1.1;
+  margin-bottom: 0.75rem;
+}
+
+h3 {
+  font-size: 1rem;
   margin: 0;
 }
 
-.counter-value {
-  color: #244d36;
-  font-size: clamp(4rem, 18vw, 9rem);
-  font-weight: 900;
-  line-height: 1;
-  margin: 2rem 0;
+.lede,
+.helper,
+.empty-state {
+  color: #405747;
+  max-width: 42rem;
 }
 
-.counter-actions {
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.tab-button {
+  background: #dfe9d9;
+  color: #1f3728;
+}
+
+.tab-button[aria-selected="true"] {
+  background: #244d36;
+  color: #ffffff;
+}
+
+.tab-panel,
+.workflow {
+  width: 100%;
+}
+
+.form-grid {
+  display: grid;
+  gap: 1rem;
+  margin: 1.25rem 0;
+}
+
+label {
+  color: #263b2d;
+  display: block;
+  font-weight: 700;
+}
+
+.actions,
+.output-header {
+  align-items: center;
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
-  justify-content: center;
+  justify-content: space-between;
+  margin: 1rem 0 0.5rem;
+}
+
+.output {
+  margin-top: 1.25rem;
+}
+
+.notice,
+.error,
+.empty-state {
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+}
+
+.notice {
+  background: #e2f0df;
+  color: #244d36;
+}
+
+.error {
+  background: #f8dfd9;
+  color: #7c261b;
+}
+
+.empty-state {
+  background: #eef3e9;
+}
+
+@media (min-width: 720px) {
+  .app-shell {
+    padding: 2.5rem;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
 }

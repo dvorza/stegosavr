@@ -10,15 +10,18 @@
   "author": "",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
+    "dev": "npm run build:wasm && vite",
+    "build": "npm run build:wasm && tsc && vite build",
+    "build:wasm": "wasm-pack build wasm-crypto --target web --out-dir ../src/wasm --release",
     "preview": "vite preview",
-    "test": "vitest run",
+    "test": "npm run test:wasm && vitest run",
+    "test:wasm": "cargo test --manifest-path wasm-crypto/Cargo.toml",
     "test:watch": "vitest"
   },
   "devDependencies": {
     "typescript": "^6.0.3",
     "vite": "^8.0.16",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.9",
+    "wasm-pack": "^0.15.0"
   }
 }
