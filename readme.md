@@ -44,6 +44,7 @@ Grammar formats use a deterministic template and encoded adjective-noun pairs:
 Built-in grammar themes:
 
 - `solemn-kit-ru`: a Russian "Торжественный комплект" style text.
+- `birthday-toast-ru`: a Russian birthday greeting style text.
 
 The encrypt page accepts either a raw public key or a supported mnemonic phrase.
 Mnemonic public keys include a checksum, so mistyped or corrupted phrases are
