@@ -2,6 +2,8 @@ import initCrypto, {
   decryptMessage,
   encryptMessage,
   generateKeyPair,
+  hideMessageInPng,
+  readMessageFromPng,
 } from "./wasm/stegosavr_crypto";
 import { normalizePublicKeyInput } from "./mnemonic/public-key";
 import { getRandomBytes } from "./random";
@@ -65,6 +67,22 @@ export async function decryptStoredMessage(request: DecryptRequest): Promise<str
   return decryptMessage(request.protectedPrivateKey, request.passphrase, encryptedMessage);
 }
 
+export async function hideEncryptedMessageInPng(
+  pngBytes: ArrayBuffer | Uint8Array,
+  encryptedMessage: string,
+): Promise<Uint8Array> {
+  await ensureCryptoReady();
+  const normalizedMessage = normalizeEncryptedMessageInput(encryptedMessage);
+
+  return hideMessageInPng(toUint8Array(pngBytes), normalizedMessage);
+}
+
+export async function readEncryptedMessageFromPng(pngBytes: ArrayBuffer | Uint8Array): Promise<string> {
+  await ensureCryptoReady();
+
+  return readMessageFromPng(toUint8Array(pngBytes));
+}
+
 export function parseGeneratedKeyPair(json: string): GeneratedKeyPair {
   const parsed = JSON.parse(json) as Partial<GeneratedKeyPair>;
 
@@ -76,4 +94,8 @@ export function parseGeneratedKeyPair(json: string): GeneratedKeyPair {
     publicKey: parsed.publicKey,
     protectedPrivateKey: parsed.protectedPrivateKey,
   };
+}
+
+function toUint8Array(bytes: ArrayBuffer | Uint8Array): Uint8Array {
+  return bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
 }

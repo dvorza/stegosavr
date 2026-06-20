@@ -11,7 +11,7 @@ The app lets a user:
 - encrypt a text message for another user's raw or mnemonic Stegosavr public key;
 - copy encrypted output as a raw message or styled grammar text;
 - decrypt a raw or styled Stegosavr encrypted message with the stored private key and passphrase;
-- preview planned meme transport workflows for future PNG-based message carriers.
+- hide an encrypted message in a PNG image and read it back from a PNG carrier.
 
 ## Public Key Formats
 
@@ -85,12 +85,30 @@ encoded words or removing chunks makes the envelope checksum fail. Built-in
 styles use fictional or abstract vocabulary; they are reversible display formats,
 not factual statements.
 
-## Meme Transport Preview
+## Meme Transport
 
-The app includes `Generate Meme` and `Read Meme` tabs as placeholders for planned
-PNG-based encrypted message transport. These views show the intended workflow,
-but they do not encode images, decode images, export PNG files, or change
-encrypted messages yet.
+The `Generate Meme` tab hides an existing encrypted Stegosavr message inside a
+PNG image and returns a downloadable PNG carrier. The `Read Meme` tab extracts a
+hidden encrypted message from a PNG carrier so it can be copied into `Decrypt
+Text`.
+
+Image transport only carries already-encrypted `STEGOSAVR-MSG:v1` message text.
+It does not encrypt plaintext or decrypt ciphertext by itself.
+
+The first image transport uses a Rust/WASM PNG-first DCT prototype. It writes one
+bit into each complete `8x8` luminance block, so approximate capacity is:
+
+```txt
+floor(width / 8) * floor(height / 8) / 8 - envelope overhead bytes
+```
+
+For example, a `1024x1024` image has about `2048` raw carrier bytes before the
+small Stegosavr stego envelope overhead. Larger encrypted messages need larger
+images.
+
+This prototype is designed for PNG round trips. It does not promise survival
+after JPEG recompression, social-network uploads, resizing, cropping, filtering,
+or screenshots.
 
 ## Security Model
 

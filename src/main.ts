@@ -1,6 +1,12 @@
 import "./styles.css";
 import { copyText } from "./clipboard";
-import { createKeyPair, decryptStoredMessage, encryptForRecipient } from "./crypto";
+import {
+  createKeyPair,
+  decryptStoredMessage,
+  encryptForRecipient,
+  hideEncryptedMessageInPng,
+  readEncryptedMessageFromPng,
+} from "./crypto";
 import { formatPublicKey, listPublicKeyDisplayFormats } from "./mnemonic/public-key";
 import { readStoredKeyPair, saveStoredKeyPair, type StoredKeyPair } from "./storage";
 import { formatEncryptedMessage, listEncryptedMessageDisplayFormats } from "./styled/messages";
@@ -17,6 +23,13 @@ interface AppState {
   encryptedMessageFormat: string;
   decryptError: string;
   decryptedMessage: string;
+  generateMemeError: string;
+  generateMemeMessage: string;
+  generatedMemeUrl: string;
+  generatedMemeName: string;
+  readMemeError: string;
+  readMemeMessage: string;
+  extractedEncryptedMessage: string;
 }
 
 const appElement = document.querySelector<HTMLElement>("#app");
@@ -37,6 +50,13 @@ const state: AppState = {
   encryptedMessageFormat: "raw",
   decryptError: "",
   decryptedMessage: "",
+  generateMemeError: "",
+  generateMemeMessage: "",
+  generatedMemeUrl: "",
+  generatedMemeName: "stegosavr-meme.png",
+  readMemeError: "",
+  readMemeMessage: "",
+  extractedEncryptedMessage: "",
 };
 
 function render(): void {
@@ -209,23 +229,23 @@ function renderGenerateMemeTab(): string {
     <section class="workflow" aria-labelledby="generate-meme-title">
       <h2 id="generate-meme-title">Generate Meme</h2>
       <p class="helper">
-        Meme transport will turn an existing encrypted message into a PNG-based carrier in a future release.
-        For now, use Encrypt Text to create the encrypted message.
+        Choose a PNG image and hide an existing encrypted Stegosavr message inside it.
+        Use Encrypt Text first if you need to create the encrypted message.
       </p>
-      <div class="form-grid" aria-describedby="generate-meme-note">
+      <form data-form="generate-meme" class="form-grid">
         <label>
           PNG image
-          <input type="file" accept="image/png" disabled />
+          <input name="pngImage" type="file" accept="image/png" />
         </label>
         <label>
           Encrypted message
-          <textarea rows="6" disabled placeholder="Paste a STEGOSAVR-MSG:v1 message here when meme generation is available."></textarea>
+          <textarea name="encryptedMessage" rows="6" placeholder="Paste a STEGOSAVR-MSG:v1 message here."></textarea>
         </label>
-        <button type="button" disabled>Generate Meme</button>
-      </div>
-      <p id="generate-meme-note" class="notice" role="status">
-        Coming soon: this placeholder does not encode images, export PNG files, or change encrypted messages.
-      </p>
+        <button type="submit">Generate Meme</button>
+      </form>
+      ${renderError(state.generateMemeError)}
+      ${renderNotice(state.generateMemeMessage)}
+      ${renderGeneratedMemeDownload()}
     </section>
   `;
 }
@@ -235,23 +255,19 @@ function renderReadMemeTab(): string {
     <section class="workflow" aria-labelledby="read-meme-title">
       <h2 id="read-meme-title">Read Meme</h2>
       <p class="helper">
-        Meme reading will extract an encrypted Stegosavr message from a PNG-based carrier in a future release.
-        For now, use Decrypt Text with an encrypted message you already have.
+        Choose a PNG image that carries a hidden Stegosavr encrypted message.
+        The extracted text can be copied into Decrypt Text.
       </p>
-      <div class="form-grid" aria-describedby="read-meme-note">
+      <form data-form="read-meme" class="form-grid">
         <label>
           PNG image
-          <input type="file" accept="image/png" disabled />
+          <input name="pngImage" type="file" accept="image/png" />
         </label>
-        <label>
-          Extracted encrypted message
-          <textarea rows="6" readonly placeholder="Extracted encrypted messages will appear here when meme reading is available."></textarea>
-        </label>
-        <button type="button" disabled>Read Meme</button>
-      </div>
-      <p id="read-meme-note" class="notice" role="status">
-        Coming soon: this placeholder does not decode images or alter encrypted messages.
-      </p>
+        <button type="submit">Read Meme</button>
+      </form>
+      ${renderError(state.readMemeError)}
+      ${renderNotice(state.readMemeMessage)}
+      ${renderOutput("Extracted encrypted message", state.extractedEncryptedMessage, "extracted-message")}
     </section>
   `;
 }
@@ -294,6 +310,23 @@ function renderEncryptedOutput(): string {
   `;
 }
 
+function renderGeneratedMemeDownload(): string {
+  if (!state.generatedMemeUrl) {
+    return "";
+  }
+
+  return `
+    <div class="output">
+      <div class="output-header">
+        <h3>Generated PNG</h3>
+        <a class="download-link" href="${state.generatedMemeUrl}" download="${escapeHtml(state.generatedMemeName)}">
+          Download PNG
+        </a>
+      </div>
+    </div>
+  `;
+}
+
 function renderNotice(message: string): string {
   return message ? `<p class="notice" role="status">${escapeHtml(message)}</p>` : "";
 }
@@ -315,6 +348,8 @@ function bindActiveTab(): void {
   app.querySelector<HTMLFormElement>('[data-form="key"]')?.addEventListener("submit", handleKeySubmit);
   app.querySelector<HTMLFormElement>('[data-form="encrypt"]')?.addEventListener("submit", handleEncryptSubmit);
   app.querySelector<HTMLFormElement>('[data-form="decrypt"]')?.addEventListener("submit", handleDecryptSubmit);
+  app.querySelector<HTMLFormElement>('[data-form="generate-meme"]')?.addEventListener("submit", handleGenerateMemeSubmit);
+  app.querySelector<HTMLFormElement>('[data-form="read-meme"]')?.addEventListener("submit", handleReadMemeSubmit);
   app.querySelector<HTMLSelectElement>("[data-public-key-format]")?.addEventListener("change", handlePublicKeyFormatChange);
   app.querySelector<HTMLSelectElement>("[data-encrypted-message-format]")?.addEventListener("change", handleEncryptedMessageFormatChange);
   app.querySelector<HTMLButtonElement>('[data-copy="public-key"]')?.addEventListener("click", () => {
@@ -322,6 +357,9 @@ function bindActiveTab(): void {
   });
   app.querySelector<HTMLButtonElement>('[data-copy="encrypted-message"]')?.addEventListener("click", () => {
     void handleCopy(getSelectedEncryptedMessageRepresentation(), "Encrypted message copied.");
+  });
+  app.querySelector<HTMLButtonElement>('[data-copy="extracted-message"]')?.addEventListener("click", () => {
+    void handleExtractedMessageCopy();
   });
 }
 
@@ -475,6 +513,98 @@ async function handleDecryptSubmit(event: SubmitEvent): Promise<void> {
   render();
 }
 
+async function handleGenerateMemeSubmit(event: SubmitEvent): Promise<void> {
+  event.preventDefault();
+  const form = event.currentTarget as HTMLFormElement;
+  const file = readFormFile(form, "pngImage");
+  const encryptedMessage = readFormValue(form, "encryptedMessage");
+
+  state.generateMemeError = "";
+  state.generateMemeMessage = "";
+  resetGeneratedMemeUrl();
+
+  if (!file) {
+    state.generateMemeError = "A PNG image is required.";
+    render();
+    return;
+  }
+
+  if (!isPngFile(file)) {
+    state.generateMemeError = "A valid PNG image is required.";
+    render();
+    return;
+  }
+
+  if (!encryptedMessage) {
+    state.generateMemeError = "An encrypted message is required.";
+    render();
+    return;
+  }
+
+  try {
+    state.generateMemeMessage = "Generating PNG...";
+    render();
+    const outputBytes = await hideEncryptedMessageInPng(await file.arrayBuffer(), encryptedMessage);
+    const outputBuffer = new ArrayBuffer(outputBytes.byteLength);
+    new Uint8Array(outputBuffer).set(outputBytes);
+    const blob = new Blob([outputBuffer], { type: "image/png" });
+    state.generatedMemeUrl = URL.createObjectURL(blob);
+    state.generatedMemeName = `stegosavr-${stripExtension(file.name) || "meme"}.png`;
+    state.generateMemeMessage = "PNG generated. Download it before generating another one.";
+  } catch (error) {
+    state.generateMemeError = getMemeErrorMessage(error, "Meme generation failed.");
+    state.generateMemeMessage = "";
+  }
+
+  render();
+}
+
+async function handleReadMemeSubmit(event: SubmitEvent): Promise<void> {
+  event.preventDefault();
+  const form = event.currentTarget as HTMLFormElement;
+  const file = readFormFile(form, "pngImage");
+
+  state.readMemeError = "";
+  state.readMemeMessage = "";
+  state.extractedEncryptedMessage = "";
+
+  if (!file) {
+    state.readMemeError = "A PNG image is required.";
+    render();
+    return;
+  }
+
+  if (!isPngFile(file)) {
+    state.readMemeError = "A valid PNG image is required.";
+    render();
+    return;
+  }
+
+  try {
+    state.readMemeMessage = "Reading PNG...";
+    render();
+    state.extractedEncryptedMessage = await readEncryptedMessageFromPng(await file.arrayBuffer());
+    state.readMemeMessage = "Encrypted message extracted.";
+  } catch (error) {
+    state.readMemeError = getMemeErrorMessage(error, "Meme reading failed.");
+    state.readMemeMessage = "";
+  }
+
+  render();
+}
+
+async function handleExtractedMessageCopy(): Promise<void> {
+  try {
+    await copyText(state.extractedEncryptedMessage);
+    state.readMemeMessage = "Extracted encrypted message copied.";
+    state.readMemeError = "";
+  } catch {
+    state.readMemeError = "Copy failed. Select the text and copy it manually.";
+  }
+
+  render();
+}
+
 async function handleCopy(value: string, successMessage: string): Promise<void> {
   try {
     await copyText(value);
@@ -491,6 +621,55 @@ function readFormValue(form: HTMLFormElement, name: string): string {
   const value = data.get(name);
 
   return typeof value === "string" ? value.trim() : "";
+}
+
+function readFormFile(form: HTMLFormElement, name: string): File | null {
+  const data = new FormData(form);
+  const value = data.get(name);
+
+  return value instanceof File && value.size > 0 ? value : null;
+}
+
+function isPngFile(file: File): boolean {
+  return file.type === "image/png" || file.name.toLowerCase().endsWith(".png");
+}
+
+function stripExtension(fileName: string): string {
+  return fileName.replace(/\.[^.]*$/, "");
+}
+
+function resetGeneratedMemeUrl(): void {
+  if (state.generatedMemeUrl) {
+    URL.revokeObjectURL(state.generatedMemeUrl);
+  }
+
+  state.generatedMemeUrl = "";
+}
+
+function getMemeErrorMessage(error: unknown, fallback: string): string {
+  const message = error instanceof Error ? error.message : String(error);
+
+  if (message.includes("valid PNG image is required")) {
+    return "A valid PNG image is required.";
+  }
+
+  if (message.includes("image capacity")) {
+    return "The encrypted message is too large for this PNG image.";
+  }
+
+  if (message.includes("no hidden encrypted message found")) {
+    return "No hidden encrypted message could be found in this PNG image.";
+  }
+
+  if (message.includes("hidden encrypted message is damaged")) {
+    return "The hidden encrypted message is damaged.";
+  }
+
+  if (message.includes("STEGOSAVR-MSG:v1")) {
+    return "A raw or supported styled Stegosavr encrypted message is required.";
+  }
+
+  return fallback;
 }
 
 function escapeHtml(value: string): string {

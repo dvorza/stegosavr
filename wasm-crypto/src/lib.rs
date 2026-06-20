@@ -10,6 +10,8 @@ use sha2::Sha256;
 use wasm_bindgen::prelude::*;
 use x25519_dalek::{PublicKey, StaticSecret};
 
+mod stego;
+
 const PUBLIC_PREFIX: &str = "STEGOSAVR-PUBLIC:v1";
 const PRIVATE_PREFIX: &str = "STEGOSAVR-PRIVATE:v1";
 const MESSAGE_PREFIX: &str = "STEGOSAVR-MSG:v1";
@@ -72,6 +74,16 @@ pub fn decrypt_message(
 ) -> Result<String, JsValue> {
     decrypt_message_inner(protected_private_key, passphrase, encrypted_message)
         .map_err(|error| JsValue::from_str(&error))
+}
+
+#[wasm_bindgen(js_name = hideMessageInPng)]
+pub fn hide_message_in_png(png_bytes: &[u8], encrypted_message: &str) -> Result<Vec<u8>, JsValue> {
+    stego::hide_message_in_png(png_bytes, encrypted_message).map_err(|error| JsValue::from_str(&error))
+}
+
+#[wasm_bindgen(js_name = readMessageFromPng)]
+pub fn read_message_from_png(png_bytes: &[u8]) -> Result<String, JsValue> {
+    stego::read_message_from_png(png_bytes).map_err(|error| JsValue::from_str(&error))
 }
 
 fn generate_key_pair_inner(
