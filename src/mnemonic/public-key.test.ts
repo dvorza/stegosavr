@@ -8,6 +8,8 @@ import {
   normalizePublicKeyInput,
   parseRawPublicKeyBytes,
 } from "./public-key";
+import { decodeGrammarPublicKey } from "./grammar-theme";
+import { solemnKitRuTheme } from "./solemn-kit-ru";
 
 const publicKeyBytes = new Uint8Array(Array.from({ length: 32 }, (_, index) => index));
 const rawPublicKey = buildRawPublicKey(publicKeyBytes);
@@ -18,11 +20,12 @@ describe("mnemonic public key format", () => {
     expect(buildRawPublicKey(publicKeyBytes)).toBe(rawPublicKey);
   });
 
-  it("lists raw, standard, and vegetables display formats", () => {
+  it("lists raw, token-grid, and grammar display formats", () => {
     expect(listPublicKeyDisplayFormats()).toEqual([
       { id: "raw", label: "Raw STEGOSAVR key" },
       { id: "standard", label: "Standard mnemonic" },
       { id: "vegetables", label: "Vegetables mnemonic" },
+      { id: "solemn-kit-ru", label: "Торжественный комплект" },
     ]);
   });
 
@@ -44,9 +47,22 @@ describe("mnemonic public key format", () => {
     expect(decodeMnemonicPublicKey(phrase)).toBe(rawPublicKey);
   });
 
-  it("normalizes raw and mnemonic recipient public key input", () => {
+  it("encodes and decodes a solemn-kit grammar text", () => {
+    const text = formatPublicKey(rawPublicKey, "solemn-kit-ru");
+
+    expect(text.startsWith(solemnKitRuTheme.marker)).toBe(true);
+    expect(countGrammarPairs(text)).toBe(36);
+    expect(decodeGrammarPublicKey(text)).toBe(rawPublicKey);
+  });
+
+  it("normalizes raw, token-grid, and grammar recipient public key input", () => {
     expect(normalizePublicKeyInput(rawPublicKey)).toBe(rawPublicKey);
     expect(normalizePublicKeyInput(encodeMnemonicPublicKey(rawPublicKey, "standard"))).toBe(rawPublicKey);
+    expect(normalizePublicKeyInput(formatPublicKey(rawPublicKey, "solemn-kit-ru"))).toBe(rawPublicKey);
+  });
+
+  it("rejects unsupported recipient public key input after trying registered codecs", () => {
+    expect(() => normalizePublicKeyInput("not a key, not a theme")).toThrow("could not be decoded");
   });
 
   it("rejects a phrase with a mistyped token", () => {
@@ -66,4 +82,38 @@ describe("mnemonic public key format", () => {
 
     expect(() => decodeMnemonicPublicKey(phrase)).toThrow("Unknown mnemonic dictionary profile");
   });
+
+  it("rejects an unknown grammar theme marker", () => {
+    const text = formatPublicKey(rawPublicKey, "solemn-kit-ru").replace(solemnKitRuTheme.marker, "🌾🌾🌾");
+
+    expect(() => decodeGrammarPublicKey(text)).toThrow("Unknown grammar mnemonic theme");
+  });
+
+  it("rejects grammar text with the wrong encoded pair count", () => {
+    const text = formatPublicKey(rawPublicKey, "solemn-kit-ru").replace("алый ваал", "редакционный шум");
+
+    expect(() => decodeGrammarPublicKey(text)).toThrow("exactly 36");
+  });
+
+  it("rejects grammar text with a checksum mismatch", () => {
+    const text = formatPublicKey(rawPublicKey, "solemn-kit-ru").replace("алый ваал", "бурный ваал");
+
+    expect(() => decodeGrammarPublicKey(text)).toThrow("checksum");
+  });
 });
+
+function countGrammarPairs(text: string): number {
+  const adjectiveValues = new Set(solemnKitRuTheme.adjectives);
+  const nounValues = new Set(solemnKitRuTheme.nouns);
+  const words = text.toLocaleLowerCase("ru").match(/\p{L}+/gu) ?? [];
+  let count = 0;
+
+  for (let index = 0; index < words.length - 1; index += 1) {
+    if (adjectiveValues.has(words[index]) && nounValues.has(words[index + 1])) {
+      count += 1;
+      index += 1;
+    }
+  }
+
+  return count;
+}

@@ -7,15 +7,17 @@ The app lets a user:
 
 - generate a local key pair protected by a passphrase;
 - store the public key and protected private key in browser `localStorage`;
-- copy the public key as a raw key, standard mnemonic phrase, or vegetables mnemonic phrase;
+- copy the public key as a raw key, token-grid mnemonic phrase, or grammar mnemonic text;
 - encrypt a text message for another user's raw or mnemonic Stegosavr public key;
 - decrypt a Stegosavr encrypted message with the stored private key and passphrase.
 
 ## Public Key Formats
 
-The raw `STEGOSAVR-PUBLIC:v1` public key remains the canonical format. The key
-page also offers reversible mnemonic display formats that encode the same public
-key bytes with fixed word and emoji slots:
+The raw `STEGOSAVR-PUBLIC:v1` public key remains the canonical format and is the
+default display option. The key page also offers reversible mnemonic display
+formats that encode the same public key bytes.
+
+Token-grid formats use fixed word and emoji slots:
 
 ```txt
 🔐 standard:v1
@@ -28,9 +30,23 @@ Built-in dictionary profiles:
 - `standard`: neutral words and emoji.
 - `vegetables`: vegetables and garden themed words and emoji.
 
+Grammar formats use a deterministic template and encoded adjective-noun pairs:
+
+```txt
+🚩📰✨
+Передовая заметка
+
+Пусть алый вал, алый ваал и алый вал выявляют алый вихрь...
+```
+
+Built-in grammar themes:
+
+- `solemn-kit-ru`: a Russian "Торжественный комплект" style text.
+
 The encrypt page accepts either a raw public key or a supported mnemonic phrase.
-Mnemonic phrases include a checksum, so mistyped or corrupted phrases are rejected
-before encryption.
+Mnemonic public keys include a checksum, so mistyped or corrupted phrases are
+rejected before encryption. Grammar texts must be copied exactly; editing words,
+punctuation around encoded pairs, or omitting lines can make decoding fail.
 
 ## Security Model
 
