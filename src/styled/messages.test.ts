@@ -12,6 +12,7 @@ describe("styled encrypted messages", () => {
     expect(listEncryptedMessageDisplayFormats()).toEqual([
       { id: "raw", label: "Raw encrypted message" },
       { id: "solemn-kit-ru", label: "Торжественный комплект" },
+      { id: "grand-chronicle-ru", label: "Большая хроника" },
     ]);
   });
 
@@ -35,6 +36,22 @@ describe("styled encrypted messages", () => {
     }
   });
 
+  it("round-trips short and multi-section grand chronicle messages", () => {
+    const messages = [
+      rawMessage,
+      `${rawMessage}${"chronicle".repeat(80)}`,
+    ];
+
+    for (const message of messages) {
+      const styled = formatEncryptedMessage(message, "grand-chronicle-ru");
+
+      expect(styled.startsWith("📜🕯️🏛️")).toBe(true);
+      expect(styled).toContain("Крым —");
+      expect(styled).toContain("Хвала хранителям");
+      expect(normalizeEncryptedMessageInput(styled)).toBe(message);
+    }
+  });
+
   it("rejects unsupported encrypted message input", () => {
     expect(() => normalizeEncryptedMessageInput("ordinary social post")).toThrow("could not be decoded");
   });
@@ -50,5 +67,24 @@ describe("styled encrypted messages", () => {
     const missingChunk = styled.replace(/Выпуск 2\.[\s\S]*?(?=\n\nВыпуск 3\.|\n\nКонец сообщения)/, "");
 
     expect(() => normalizeEncryptedMessageInput(missingChunk)).toThrow("could not be decoded");
+  });
+
+  it("rejects corrupted grand chronicle text", () => {
+    const styled = formatEncryptedMessage(rawMessage, "grand-chronicle-ru").replace("искристый голос", "вечерний голос");
+
+    expect(() => normalizeEncryptedMessageInput(styled)).toThrow("could not be decoded");
+  });
+
+  it("rejects grand chronicle text with missing sections", () => {
+    const styled = formatEncryptedMessage(`${rawMessage}${"section".repeat(90)}`, "grand-chronicle-ru");
+    const missingSection = styled.replace(/Крым —[\s\S]*?(?=\n\nКрым —|\n\nТак завершается)/, "");
+
+    expect(() => normalizeEncryptedMessageInput(missingSection)).toThrow("could not be decoded");
+  });
+
+  it("rejects grand chronicle text with an unknown marker", () => {
+    const styled = formatEncryptedMessage(rawMessage, "grand-chronicle-ru").replace("📜🕯️🏛️", "📜📜📜");
+
+    expect(() => normalizeEncryptedMessageInput(styled)).toThrow("could not be decoded");
   });
 });

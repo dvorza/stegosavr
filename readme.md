@@ -62,11 +62,27 @@ encrypted message as styled grammar text:
 Выпуск 1. Пусть заветный враг, ...
 ```
 
+Or as a longer chronicle-style text:
+
+```txt
+📜🕯️🏛️
+Летописная запись
+
+Город — заветный голос. Город — гранитный архив...
+```
+
+Built-in encrypted message styles:
+
+- `solemn-kit-ru`: compact Russian ceremonial chunks.
+- `grand-chronicle-ru`: longer fictional chronicle prose with repeated declarations and praise-like sections.
+
 Styled encrypted messages use a variable-length envelope around the canonical
 encrypted message string, then encode that envelope as generated text. The
 decrypt page accepts either the raw encrypted message or a supported styled
 encrypted message. Styled encrypted messages must be copied exactly; changing
-encoded words or removing chunks makes the envelope checksum fail.
+encoded words or removing chunks makes the envelope checksum fail. Built-in
+styles use fictional or abstract vocabulary; they are reversible display formats,
+not factual statements.
 
 ## Security Model
 

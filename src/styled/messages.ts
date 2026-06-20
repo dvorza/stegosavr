@@ -5,13 +5,14 @@ import {
   serializeStyledEnvelope,
   STYLED_KIND_ENCRYPTED_MESSAGE,
 } from "./envelope";
+import { grandChronicleStyledCodec } from "./grand-chronicle";
 
 export const RAW_ENCRYPTED_MESSAGE_FORMAT = "raw";
 export const RAW_ENCRYPTED_MESSAGE_PREFIX = "STEGOSAVR-MSG:v1:";
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
-const styledCodecs: StyledByteCodec[] = [chunkedGrammarStyledCodec];
+const styledCodecs: StyledByteCodec[] = [chunkedGrammarStyledCodec, grandChronicleStyledCodec];
 
 export function listEncryptedMessageDisplayFormats(): StyledDisplayFormat[] {
   return [
