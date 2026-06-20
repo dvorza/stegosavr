@@ -10,6 +10,8 @@ import {
 } from "./public-key";
 import { decodeGrammarPublicKey } from "./grammar-theme";
 import { birthdayToastRuTheme } from "./birthday-toast-ru";
+import type { GrammarThemeProfile } from "./grammar-theme";
+import { lifeWishRuTheme } from "./life-wish-ru";
 import { solemnKitRuTheme } from "./solemn-kit-ru";
 
 const publicKeyBytes = new Uint8Array(Array.from({ length: 32 }, (_, index) => index));
@@ -28,6 +30,7 @@ describe("mnemonic public key format", () => {
       { id: "vegetables", label: "Vegetables mnemonic" },
       { id: "solemn-kit-ru", label: "Торжественный комплект" },
       { id: "birthday-toast-ru", label: "Поздравление с днем рождения" },
+      { id: "life-wish-ru", label: "Пожелание неповторимого" },
     ]);
   });
 
@@ -66,11 +69,22 @@ describe("mnemonic public key format", () => {
     expect(decodeGrammarPublicKey(text)).toBe(rawPublicKey);
   });
 
+  it("encodes and decodes a life wish grammar text", () => {
+    const text = formatPublicKey(rawPublicKey, "life-wish-ru");
+
+    expect(text.startsWith(lifeWishRuTheme.marker)).toBe(true);
+    expect(text).toContain("Пусть будет в жизни все");
+    expect(text).toContain("НЕПОВТОРИМОЕ");
+    expect(countGrammarPairs(text, lifeWishRuTheme)).toBe(36);
+    expect(decodeGrammarPublicKey(text)).toBe(rawPublicKey);
+  });
+
   it("normalizes raw, token-grid, and grammar recipient public key input", () => {
     expect(normalizePublicKeyInput(rawPublicKey)).toBe(rawPublicKey);
     expect(normalizePublicKeyInput(encodeMnemonicPublicKey(rawPublicKey, "standard"))).toBe(rawPublicKey);
     expect(normalizePublicKeyInput(formatPublicKey(rawPublicKey, "solemn-kit-ru"))).toBe(rawPublicKey);
     expect(normalizePublicKeyInput(formatPublicKey(rawPublicKey, "birthday-toast-ru"))).toBe(rawPublicKey);
+    expect(normalizePublicKeyInput(formatPublicKey(rawPublicKey, "life-wish-ru"))).toBe(rawPublicKey);
   });
 
   it("rejects unsupported recipient public key input after trying registered codecs", () => {
@@ -118,9 +132,15 @@ describe("mnemonic public key format", () => {
 
     expect(() => decodeGrammarPublicKey(text)).toThrow("checksum");
   });
+
+  it("rejects life wish text with a checksum mismatch", () => {
+    const text = formatPublicKey(rawPublicKey, "life-wish-ru").replace("ласковый луч", "бережный луч");
+
+    expect(() => decodeGrammarPublicKey(text)).toThrow("checksum");
+  });
 });
 
-function countGrammarPairs(text: string, theme: typeof solemnKitRuTheme | typeof birthdayToastRuTheme): number {
+function countGrammarPairs(text: string, theme: GrammarThemeProfile): number {
   const adjectiveValues = new Set(theme.adjectives);
   const nounValues = new Set(theme.nouns);
   const words = text.toLocaleLowerCase("ru").match(/\p{L}+/gu) ?? [];

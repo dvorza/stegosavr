@@ -1,6 +1,7 @@
 import { buildPayload, PAYLOAD_BYTES, publicKeyBytesFromPayload } from "./payload";
 import { buildRawPublicKey, parseRawPublicKeyBytes } from "./raw-key";
 import { birthdayToastRuTheme } from "./birthday-toast-ru";
+import { lifeWishRuTheme } from "./life-wish-ru";
 import { solemnKitRuTheme } from "./solemn-kit-ru";
 
 export interface GrammarThemeProfile {
@@ -14,7 +15,7 @@ export interface GrammarThemeProfile {
 
 const NIBBLE_COUNT = 16;
 
-export const grammarThemeProfiles = [solemnKitRuTheme, birthdayToastRuTheme] as const;
+export const grammarThemeProfiles = [solemnKitRuTheme, birthdayToastRuTheme, lifeWishRuTheme] as const;
 
 export function listGrammarThemeDisplayFormats(): { id: string; label: string }[] {
   return grammarThemeProfiles.map((theme) => ({

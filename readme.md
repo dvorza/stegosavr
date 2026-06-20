@@ -47,6 +47,7 @@ Built-in grammar themes:
 
 - `solemn-kit-ru`: a Russian "Торжественный комплект" style text.
 - `birthday-toast-ru`: a Russian birthday greeting style text.
+- `life-wish-ru`: a Russian "Пусть будет в жизни все..." wish style text.
 
 The encode image workflow accepts either a raw public key or a supported
 mnemonic phrase. Mnemonic public keys include a checksum, so mistyped or

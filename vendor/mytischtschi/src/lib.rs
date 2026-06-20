@@ -958,7 +958,6 @@ mod wasm {
             Error::Encryption => "Encryption",
             Error::InvalidKey { .. } => "InvalidKey",
             Error::Image(_) => "ImageError",
-            _ => "Error",
         }
     }
 
