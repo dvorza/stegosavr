@@ -87,13 +87,18 @@ not factual statements.
 
 ## Meme Transport
 
-The `Generate Meme` tab hides an existing encrypted Stegosavr message inside a
-PNG image and returns a downloadable PNG carrier. The `Read Meme` tab extracts a
-hidden encrypted message from a PNG carrier so it can be copied into `Decrypt
-Text`.
+The `Generate Meme` tab creates a PNG carrier in one flow: choose a PNG image,
+paste the recipient's public key, write a plaintext message, and generate the
+result. The app encrypts the message locally, hides the encrypted payload in the
+PNG, shows a preview of the generated image, and provides a download action for
+that same PNG.
 
-Image transport only carries already-encrypted `STEGOSAVR-MSG:v1` message text.
-It does not encrypt plaintext or decrypt ciphertext by itself.
+The `Read Meme` tab mirrors that flow: choose a PNG carrier, enter the
+passphrase for the stored local key, and read the plaintext message directly in
+the tab. It also provides a copy action for the plaintext result.
+
+Image transport only carries `STEGOSAVR-MSG:v1` encrypted message text. It does
+not expose encrypted-payload editing controls in the meme workflows.
 
 The first image transport uses a Rust/WASM PNG-first DCT prototype. It writes one
 bit into each complete `8x8` luminance block, so approximate capacity is:

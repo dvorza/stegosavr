@@ -31,6 +31,18 @@ export interface DecryptRequest {
   encryptedMessage: string;
 }
 
+export interface GenerateMemePngRequest {
+  pngBytes: ArrayBuffer | Uint8Array;
+  recipientPublicKey: string;
+  plaintext: string;
+}
+
+export interface ReadMemeMessageRequest {
+  pngBytes: ArrayBuffer | Uint8Array;
+  protectedPrivateKey: string;
+  passphrase: string;
+}
+
 export async function ensureCryptoReady(): Promise<void> {
   cryptoInit ??= initCrypto().then(() => undefined);
   await cryptoInit;
@@ -77,10 +89,29 @@ export async function hideEncryptedMessageInPng(
   return hideMessageInPng(toUint8Array(pngBytes), normalizedMessage);
 }
 
+export async function generateMemePngForRecipient(request: GenerateMemePngRequest): Promise<Uint8Array> {
+  const encryptedMessage = await encryptForRecipient({
+    recipientPublicKey: request.recipientPublicKey,
+    plaintext: request.plaintext,
+  });
+
+  return hideEncryptedMessageInPng(request.pngBytes, encryptedMessage);
+}
+
 export async function readEncryptedMessageFromPng(pngBytes: ArrayBuffer | Uint8Array): Promise<string> {
   await ensureCryptoReady();
 
   return readMessageFromPng(toUint8Array(pngBytes));
+}
+
+export async function readMemeMessageFromPng(request: ReadMemeMessageRequest): Promise<string> {
+  const encryptedMessage = await readEncryptedMessageFromPng(request.pngBytes);
+
+  return decryptStoredMessage({
+    protectedPrivateKey: request.protectedPrivateKey,
+    passphrase: request.passphrase,
+    encryptedMessage,
+  });
 }
 
 export function parseGeneratedKeyPair(json: string): GeneratedKeyPair {

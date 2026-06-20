@@ -4,8 +4,8 @@ import {
   createKeyPair,
   decryptStoredMessage,
   encryptForRecipient,
-  hideEncryptedMessageInPng,
-  readEncryptedMessageFromPng,
+  generateMemePngForRecipient,
+  readMemeMessageFromPng,
 } from "./crypto";
 import { formatPublicKey, listPublicKeyDisplayFormats } from "./mnemonic/public-key";
 import { readStoredKeyPair, saveStoredKeyPair, type StoredKeyPair } from "./storage";
@@ -29,7 +29,7 @@ interface AppState {
   generatedMemeName: string;
   readMemeError: string;
   readMemeMessage: string;
-  extractedEncryptedMessage: string;
+  readMemePlaintext: string;
 }
 
 const appElement = document.querySelector<HTMLElement>("#app");
@@ -56,7 +56,7 @@ const state: AppState = {
   generatedMemeName: "stegosavr-meme.png",
   readMemeError: "",
   readMemeMessage: "",
-  extractedEncryptedMessage: "",
+  readMemePlaintext: "",
 };
 
 function render(): void {
@@ -229,8 +229,8 @@ function renderGenerateMemeTab(): string {
     <section class="workflow" aria-labelledby="generate-meme-title">
       <h2 id="generate-meme-title">Generate Meme</h2>
       <p class="helper">
-        Choose a PNG image and hide an existing encrypted Stegosavr message inside it.
-        Use Encrypt Text first if you need to create the encrypted message.
+        Choose a PNG image, paste the recipient's public key, and write the message you want to send.
+        Stegosavr encrypts it locally before hiding it in the PNG.
       </p>
       <form data-form="generate-meme" class="form-grid">
         <label>
@@ -238,8 +238,12 @@ function renderGenerateMemeTab(): string {
           <input name="pngImage" type="file" accept="image/png" />
         </label>
         <label>
-          Encrypted message
-          <textarea name="encryptedMessage" rows="6" placeholder="Paste a STEGOSAVR-MSG:v1 message here."></textarea>
+          Recipient public key
+          <textarea name="recipientPublicKey" rows="5"></textarea>
+        </label>
+        <label>
+          Message
+          <textarea name="plaintext" rows="6"></textarea>
         </label>
         <button type="submit">Generate Meme</button>
       </form>
@@ -251,23 +255,35 @@ function renderGenerateMemeTab(): string {
 }
 
 function renderReadMemeTab(): string {
+  if (!state.storedKeyPair) {
+    return `
+      <section class="workflow" aria-labelledby="read-meme-title">
+        <h2 id="read-meme-title">Read Meme</h2>
+        <p class="empty-state">Generate your local key before reading meme messages addressed to you.</p>
+      </section>
+    `;
+  }
+
   return `
     <section class="workflow" aria-labelledby="read-meme-title">
       <h2 id="read-meme-title">Read Meme</h2>
       <p class="helper">
-        Choose a PNG image that carries a hidden Stegosavr encrypted message.
-        The extracted text can be copied into Decrypt Text.
+        Choose a PNG image that carries a hidden Stegosavr encrypted message and enter your passphrase.
       </p>
       <form data-form="read-meme" class="form-grid">
         <label>
           PNG image
           <input name="pngImage" type="file" accept="image/png" />
         </label>
+        <label>
+          Passphrase
+          <input name="passphrase" type="password" autocomplete="current-password" />
+        </label>
         <button type="submit">Read Meme</button>
       </form>
       ${renderError(state.readMemeError)}
       ${renderNotice(state.readMemeMessage)}
-      ${renderOutput("Extracted encrypted message", state.extractedEncryptedMessage, "extracted-message")}
+      ${renderOutput("Plaintext", state.readMemePlaintext, "read-meme-plaintext")}
     </section>
   `;
 }
@@ -323,6 +339,11 @@ function renderGeneratedMemeDownload(): string {
           Download PNG
         </a>
       </div>
+      <img
+        class="generated-meme-preview"
+        src="${state.generatedMemeUrl}"
+        alt="Generated meme with hidden encrypted message"
+      />
     </div>
   `;
 }
@@ -358,8 +379,8 @@ function bindActiveTab(): void {
   app.querySelector<HTMLButtonElement>('[data-copy="encrypted-message"]')?.addEventListener("click", () => {
     void handleCopy(getSelectedEncryptedMessageRepresentation(), "Encrypted message copied.");
   });
-  app.querySelector<HTMLButtonElement>('[data-copy="extracted-message"]')?.addEventListener("click", () => {
-    void handleExtractedMessageCopy();
+  app.querySelector<HTMLButtonElement>('[data-copy="read-meme-plaintext"]')?.addEventListener("click", () => {
+    void handleReadMemePlaintextCopy();
   });
 }
 
@@ -517,7 +538,6 @@ async function handleGenerateMemeSubmit(event: SubmitEvent): Promise<void> {
   event.preventDefault();
   const form = event.currentTarget as HTMLFormElement;
   const file = readFormFile(form, "pngImage");
-  const encryptedMessage = readFormValue(form, "encryptedMessage");
 
   state.generateMemeError = "";
   state.generateMemeMessage = "";
@@ -535,8 +555,9 @@ async function handleGenerateMemeSubmit(event: SubmitEvent): Promise<void> {
     return;
   }
 
-  if (!encryptedMessage) {
-    state.generateMemeError = "An encrypted message is required.";
+  const validationError = validateGenerateMemeForm(form);
+  if (validationError) {
+    state.generateMemeError = validationError;
     render();
     return;
   }
@@ -544,7 +565,11 @@ async function handleGenerateMemeSubmit(event: SubmitEvent): Promise<void> {
   try {
     state.generateMemeMessage = "Generating PNG...";
     render();
-    const outputBytes = await hideEncryptedMessageInPng(await file.arrayBuffer(), encryptedMessage);
+    const outputBytes = await generateMemePngForRecipient({
+      pngBytes: await file.arrayBuffer(),
+      recipientPublicKey: readFormValue(form, "recipientPublicKey"),
+      plaintext: readFormValue(form, "plaintext"),
+    });
     const outputBuffer = new ArrayBuffer(outputBytes.byteLength);
     new Uint8Array(outputBuffer).set(outputBytes);
     const blob = new Blob([outputBuffer], { type: "image/png" });
@@ -559,14 +584,34 @@ async function handleGenerateMemeSubmit(event: SubmitEvent): Promise<void> {
   render();
 }
 
+function validateGenerateMemeForm(form: HTMLFormElement): string {
+  if (!readFormValue(form, "recipientPublicKey")) {
+    return "Recipient public key is required.";
+  }
+
+  if (!readFormValue(form, "plaintext")) {
+    return "A message is required.";
+  }
+
+  return "";
+}
+
 async function handleReadMemeSubmit(event: SubmitEvent): Promise<void> {
   event.preventDefault();
+
+  if (!state.storedKeyPair) {
+    state.readMemeError = "Generate a local key before reading meme messages.";
+    render();
+    return;
+  }
+
   const form = event.currentTarget as HTMLFormElement;
   const file = readFormFile(form, "pngImage");
+  const passphrase = readFormValue(form, "passphrase");
 
   state.readMemeError = "";
   state.readMemeMessage = "";
-  state.extractedEncryptedMessage = "";
+  state.readMemePlaintext = "";
 
   if (!file) {
     state.readMemeError = "A PNG image is required.";
@@ -580,23 +625,33 @@ async function handleReadMemeSubmit(event: SubmitEvent): Promise<void> {
     return;
   }
 
+  if (!passphrase) {
+    state.readMemeError = "Passphrase is required.";
+    render();
+    return;
+  }
+
   try {
     state.readMemeMessage = "Reading PNG...";
     render();
-    state.extractedEncryptedMessage = await readEncryptedMessageFromPng(await file.arrayBuffer());
-    state.readMemeMessage = "Encrypted message extracted.";
+    state.readMemePlaintext = await readMemeMessageFromPng({
+      pngBytes: await file.arrayBuffer(),
+      protectedPrivateKey: state.storedKeyPair.protectedPrivateKey,
+      passphrase,
+    });
+    state.readMemeMessage = "Meme message decrypted.";
   } catch (error) {
-    state.readMemeError = getMemeErrorMessage(error, "Meme reading failed.");
+    state.readMemeError = getMemeErrorMessage(error, "Meme reading failed. Check the passphrase and image.");
     state.readMemeMessage = "";
   }
 
   render();
 }
 
-async function handleExtractedMessageCopy(): Promise<void> {
+async function handleReadMemePlaintextCopy(): Promise<void> {
   try {
-    await copyText(state.extractedEncryptedMessage);
-    state.readMemeMessage = "Extracted encrypted message copied.";
+    await copyText(state.readMemePlaintext);
+    state.readMemeMessage = "Plaintext copied.";
     state.readMemeError = "";
   } catch {
     state.readMemeError = "Copy failed. Select the text and copy it manually.";
@@ -667,6 +722,10 @@ function getMemeErrorMessage(error: unknown, fallback: string): string {
 
   if (message.includes("STEGOSAVR-MSG:v1")) {
     return "A raw or supported styled Stegosavr encrypted message is required.";
+  }
+
+  if (message.includes("public key") || message.includes("could not be decoded")) {
+    return "The recipient public key could not be decoded.";
   }
 
   return fallback;

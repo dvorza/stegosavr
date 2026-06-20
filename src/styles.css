@@ -178,6 +178,15 @@ label {
   margin-top: 1.25rem;
 }
 
+.generated-meme-preview {
+  border: 1px solid #c9d7c3;
+  border-radius: 8px;
+  display: block;
+  max-height: 28rem;
+  max-width: 100%;
+  object-fit: contain;
+}
+
 .notice,
 .error,
 .empty-state {
