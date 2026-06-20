@@ -3,3 +3,5 @@ dist
 coverage
 wasm-crypto/target
 .DS_Store
+.claude/
+.idea/
