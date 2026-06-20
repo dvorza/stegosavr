@@ -1,78 +1,73 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { formatEncryptedMessage } from "./styled/messages";
 
 vi.mock("./wasm/stegosavr_crypto", () => ({
   default: vi.fn(() => Promise.resolve()),
-  decryptMessage: vi.fn(() => "hello from image"),
-  encryptMessage: vi.fn(() => "STEGOSAVR-MSG:v1:public:nonce:ciphertext"),
-  generateKeyPair: vi.fn(),
-  hideMessageInPng: vi.fn(() => new Uint8Array([9, 8, 7])),
-  readMessageFromPng: vi.fn(() => "STEGOSAVR-MSG:v1:public:nonce:ciphertext"),
+  analyzeStegosavrMessage: vi.fn(() =>
+    JSON.stringify({ alphabet: "english", charCount: 11, maxChars: 160, fits: true }),
+  ),
+  decodeImage: vi.fn(() => "hello from image"),
+  encodeImage: vi.fn(() => new Uint8Array([9, 8, 7])),
+  generateStegosavrKeyPair: vi.fn(),
+  inspectStegosavrCarrier: vi.fn(() =>
+    JSON.stringify({ width: 640, height: 480, symbolErrors: 2, correctableSymbolErrors: 50, suitable: true }),
+  ),
+  stegosavrMessageLimits: vi.fn(() => JSON.stringify({ english: 160, russian: 120 })),
 }));
 
-const rawMessage = "STEGOSAVR-MSG:v1:public:nonce:ciphertext";
 const rawPublicKey = "STEGOSAVR-PUBLIC:v1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 
-describe("PNG stego crypto wrappers", () => {
+describe("image transport crypto wrappers", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("encrypts plaintext before hiding the encrypted message in PNG bytes", async () => {
-    const { generateMemePngForRecipient } = await import("./crypto");
-    const { encryptMessage, hideMessageInPng } = await import("./wasm/stegosavr_crypto");
-    const result = await generateMemePngForRecipient({
-      pngBytes: new Uint8Array([1, 2, 3]),
+  it("analyzes plaintext messages through the Stegosavr adapter", async () => {
+    const { analyzePlaintextMessage } = await import("./crypto");
+    const { analyzeStegosavrMessage } = await import("./wasm/stegosavr_crypto");
+
+    await expect(analyzePlaintextMessage("hello there")).resolves.toEqual({
+      alphabet: "english",
+      charCount: 11,
+      maxChars: 160,
+      fits: true,
+    });
+    expect(analyzeStegosavrMessage).toHaveBeenCalledWith("hello there");
+  });
+
+  it("inspects image carriers through the Stegosavr adapter", async () => {
+    const { inspectImageCarrier } = await import("./crypto");
+    const { inspectStegosavrCarrier } = await import("./wasm/stegosavr_crypto");
+    const bytes = new Uint8Array([1, 2, 3]);
+
+    await expect(inspectImageCarrier(bytes.buffer)).resolves.toMatchObject({ suitable: true });
+    expect(inspectStegosavrCarrier).toHaveBeenCalledWith(bytes);
+  });
+
+  it("encodes plaintext directly into image bytes", async () => {
+    const { encodeImageForRecipient } = await import("./crypto");
+    const { encodeImage } = await import("./wasm/stegosavr_crypto");
+    const result = await encodeImageForRecipient({
+      imageBytes: new Uint8Array([1, 2, 3]),
       recipientPublicKey: rawPublicKey,
       plaintext: "hello there",
     });
 
     expect(result).toEqual(new Uint8Array([9, 8, 7]));
-    expect(encryptMessage).toHaveBeenCalledWith(
-      rawPublicKey,
-      "hello there",
-      expect.any(Uint8Array),
-      expect.any(Uint8Array),
-    );
-    expect(hideMessageInPng).toHaveBeenCalledWith(new Uint8Array([1, 2, 3]), rawMessage);
+    expect(encodeImage).toHaveBeenCalledWith(new Uint8Array([1, 2, 3]), rawPublicKey, "hello there");
   });
 
-  it("normalizes encrypted message input before hiding it in PNG bytes", async () => {
-    const { hideEncryptedMessageInPng } = await import("./crypto");
-    const { hideMessageInPng } = await import("./wasm/stegosavr_crypto");
-    const styledMessage = formatEncryptedMessage(rawMessage, "solemn-kit-ru");
-    const result = await hideEncryptedMessageInPng(new Uint8Array([1, 2, 3]), styledMessage);
-
-    expect(result).toEqual(new Uint8Array([9, 8, 7]));
-    expect(hideMessageInPng).toHaveBeenCalledWith(new Uint8Array([1, 2, 3]), rawMessage);
-  });
-
-  it("reads encrypted message text from PNG bytes", async () => {
-    const { readEncryptedMessageFromPng } = await import("./crypto");
-    const { readMessageFromPng } = await import("./wasm/stegosavr_crypto");
-    const bytes = new Uint8Array([4, 5, 6]);
-
-    await expect(readEncryptedMessageFromPng(bytes.buffer)).resolves.toBe(rawMessage);
-    expect(readMessageFromPng).toHaveBeenCalledWith(bytes);
-  });
-
-  it("reads and decrypts a meme message from PNG bytes", async () => {
-    const { readMemeMessageFromPng } = await import("./crypto");
-    const { decryptMessage, readMessageFromPng } = await import("./wasm/stegosavr_crypto");
+  it("reads and decrypts an image message through the adapter", async () => {
+    const { readMessageFromImage } = await import("./crypto");
+    const { decodeImage } = await import("./wasm/stegosavr_crypto");
     const bytes = new Uint8Array([7, 8, 9]);
 
     await expect(
-      readMemeMessageFromPng({
-        pngBytes: bytes,
-        protectedPrivateKey: "STEGOSAVR-PRIVATE:v1:salt:nonce:ciphertext",
+      readMessageFromImage({
+        imageBytes: bytes,
+        protectedPrivateKey: "STEGOSAVR-PRIVATE:v2:salt:nonce:ciphertext",
         passphrase: "secret",
       }),
     ).resolves.toBe("hello from image");
-    expect(readMessageFromPng).toHaveBeenCalledWith(bytes);
-    expect(decryptMessage).toHaveBeenCalledWith(
-      "STEGOSAVR-PRIVATE:v1:salt:nonce:ciphertext",
-      "secret",
-      rawMessage,
-    );
+    expect(decodeImage).toHaveBeenCalledWith(bytes, "STEGOSAVR-PRIVATE:v2:salt:nonce:ciphertext", "secret");
   });
 });

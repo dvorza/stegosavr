@@ -7,12 +7,12 @@ describe("parseGeneratedKeyPair", () => {
       parseGeneratedKeyPair(
         JSON.stringify({
           publicKey: "STEGOSAVR-PUBLIC:v1:abc",
-          protectedPrivateKey: "STEGOSAVR-PRIVATE:v1:salt:nonce:ciphertext",
+          protectedPrivateKey: "STEGOSAVR-PRIVATE:v2:salt:nonce:ciphertext",
         }),
       ),
     ).toEqual({
       publicKey: "STEGOSAVR-PUBLIC:v1:abc",
-      protectedPrivateKey: "STEGOSAVR-PRIVATE:v1:salt:nonce:ciphertext",
+      protectedPrivateKey: "STEGOSAVR-PRIVATE:v2:salt:nonce:ciphertext",
     });
   });
 

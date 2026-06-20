@@ -3,19 +3,16 @@ use chacha20poly1305::{
     aead::{Aead, KeyInit},
     ChaCha20Poly1305, Key, Nonce,
 };
-use hkdf::Hkdf;
+use mytischtschi::{self, Error as EngineError};
 use pbkdf2::pbkdf2_hmac;
 use serde::Serialize;
 use sha2::Sha256;
 use wasm_bindgen::prelude::*;
-use x25519_dalek::{PublicKey, StaticSecret};
-
-mod stego;
 
 const PUBLIC_PREFIX: &str = "STEGOSAVR-PUBLIC:v1";
-const PRIVATE_PREFIX: &str = "STEGOSAVR-PRIVATE:v1";
-const MESSAGE_PREFIX: &str = "STEGOSAVR-MSG:v1";
+const PRIVATE_PREFIX: &str = "STEGOSAVR-PRIVATE:v2";
 const KEY_BYTES: usize = 32;
+const SECRET_HEX_BYTES: usize = 64;
 const NONCE_BYTES: usize = 12;
 const SALT_BYTES: usize = 16;
 const PBKDF2_ROUNDS: u32 = 210_000;
@@ -28,98 +25,124 @@ struct GeneratedKeyPair {
     protected_private_key: String,
 }
 
-#[wasm_bindgen(js_name = generateKeyPair)]
+#[derive(Serialize)]
+struct Limits {
+    english: usize,
+    russian: usize,
+}
+
+#[wasm_bindgen(js_name = generateStegosavrKeyPair)]
 pub fn generate_key_pair(
     passphrase: &str,
-    key_random: &[u8],
     salt_random: &[u8],
     nonce_random: &[u8],
 ) -> Result<String, JsValue> {
-    generate_key_pair_inner(passphrase, key_random, salt_random, nonce_random)
-        .map_err(|error| JsValue::from_str(&error))
+    generate_key_pair_inner(passphrase, salt_random, nonce_random).map_err(throw_message)
 }
 
-#[wasm_bindgen(js_name = protectPrivateKey)]
-pub fn protect_private_key(
-    raw_private_key: &[u8],
-    passphrase: &str,
-    salt_random: &[u8],
-    nonce_random: &[u8],
-) -> Result<String, JsValue> {
-    protect_private_key_inner(raw_private_key, passphrase, salt_random, nonce_random)
-        .map_err(|error| JsValue::from_str(&error))
+#[wasm_bindgen(js_name = stegosavrMessageLimits)]
+pub fn message_limits() -> Result<String, JsValue> {
+    to_json(&Limits {
+        english: mytischtschi::MAX_CHARS_ENGLISH,
+        russian: mytischtschi::MAX_CHARS_RUSSIAN,
+    })
+    .map_err(throw_message)
 }
 
-#[wasm_bindgen(js_name = unlockPrivateKey)]
-pub fn unlock_private_key(protected_private_key: &str, passphrase: &str) -> Result<Vec<u8>, JsValue> {
-    unlock_private_key_inner(protected_private_key, passphrase).map_err(|error| JsValue::from_str(&error))
+#[wasm_bindgen(js_name = analyzeStegosavrMessage)]
+pub fn analyze_message(text: &str) -> Result<String, JsValue> {
+    mytischtschi::analyze_message(text)
+        .map_err(throw_engine)
+        .and_then(|report| to_json(&report).map_err(throw_message))
 }
 
-#[wasm_bindgen(js_name = encryptMessage)]
-pub fn encrypt_message(
+#[wasm_bindgen(js_name = inspectStegosavrCarrier)]
+pub fn inspect_carrier(image_bytes: &[u8]) -> Result<String, JsValue> {
+    mytischtschi::inspect_carrier(image_bytes)
+        .map_err(throw_engine)
+        .and_then(|report| to_json(&report).map_err(throw_message))
+}
+
+#[wasm_bindgen(js_name = encodeImage)]
+pub fn encode_image(
+    image_bytes: &[u8],
     recipient_public_key: &str,
     plaintext: &str,
-    ephemeral_random: &[u8],
-    nonce_random: &[u8],
-) -> Result<String, JsValue> {
-    encrypt_message_inner(recipient_public_key, plaintext, ephemeral_random, nonce_random)
-        .map_err(|error| JsValue::from_str(&error))
+) -> Result<Vec<u8>, JsValue> {
+    encode_image_inner(image_bytes, recipient_public_key, plaintext).map_err(throw_engine)
 }
 
-#[wasm_bindgen(js_name = decryptMessage)]
-pub fn decrypt_message(
+#[wasm_bindgen(js_name = decodeImage)]
+pub fn decode_image(
+    image_bytes: &[u8],
     protected_private_key: &str,
     passphrase: &str,
-    encrypted_message: &str,
 ) -> Result<String, JsValue> {
-    decrypt_message_inner(protected_private_key, passphrase, encrypted_message)
-        .map_err(|error| JsValue::from_str(&error))
+    decode_image_inner(image_bytes, protected_private_key, passphrase).map_err(
+        |error| match error {
+            AdapterError::Message(message) => throw_message(message),
+            AdapterError::Engine(error) => throw_engine(error),
+        },
+    )
 }
 
-#[wasm_bindgen(js_name = hideMessageInPng)]
-pub fn hide_message_in_png(png_bytes: &[u8], encrypted_message: &str) -> Result<Vec<u8>, JsValue> {
-    stego::hide_message_in_png(png_bytes, encrypted_message).map_err(|error| JsValue::from_str(&error))
+fn encode_image_inner(
+    image_bytes: &[u8],
+    recipient_public_key: &str,
+    plaintext: &str,
+) -> mytischtschi::Result<Vec<u8>> {
+    let public_hex = public_key_to_engine_hex(recipient_public_key)
+        .map_err(|_| EngineError::InvalidKey { expected: 64 })?;
+    mytischtschi::encrypt_and_embed(image_bytes, &public_hex, plaintext)
 }
 
-#[wasm_bindgen(js_name = readMessageFromPng)]
-pub fn read_message_from_png(png_bytes: &[u8]) -> Result<String, JsValue> {
-    stego::read_message_from_png(png_bytes).map_err(|error| JsValue::from_str(&error))
+fn decode_image_inner(
+    image_bytes: &[u8],
+    protected_private_key: &str,
+    passphrase: &str,
+) -> Result<String, AdapterError> {
+    let secret_hex =
+        unlock_secret_hex(protected_private_key, passphrase).map_err(AdapterError::Message)?;
+    mytischtschi::extract_and_decrypt(image_bytes, &secret_hex).map_err(AdapterError::Engine)
+}
+
+#[derive(Debug)]
+enum AdapterError {
+    Message(String),
+    Engine(EngineError),
 }
 
 fn generate_key_pair_inner(
     passphrase: &str,
-    key_random: &[u8],
     salt_random: &[u8],
     nonce_random: &[u8],
 ) -> Result<String, String> {
     require_passphrase(passphrase)?;
-    let private_key = fixed_bytes::<KEY_BYTES>(key_random, "key randomness")?;
-    let secret = StaticSecret::from(private_key);
-    let public_key = PublicKey::from(&secret);
+    let keys = mytischtschi::generate_keypair();
     let protected_private_key =
-        protect_private_key_inner(&private_key, passphrase, salt_random, nonce_random)?;
+        protect_secret_hex(&keys.secret_hex, passphrase, salt_random, nonce_random)?;
     let response = GeneratedKeyPair {
-        public_key: format!("{}:{}", PUBLIC_PREFIX, encode(public_key.as_bytes())),
+        public_key: engine_hex_to_public_key(&keys.public_hex)?,
         protected_private_key,
     };
 
-    serde_json::to_string(&response).map_err(|_| "failed to encode generated key pair".to_string())
+    to_json(&response)
 }
 
-fn protect_private_key_inner(
-    raw_private_key: &[u8],
+fn protect_secret_hex(
+    secret_hex: &str,
     passphrase: &str,
     salt_random: &[u8],
     nonce_random: &[u8],
 ) -> Result<String, String> {
     require_passphrase(passphrase)?;
-    let private_key = fixed_bytes::<KEY_BYTES>(raw_private_key, "private key")?;
+    require_hex(secret_hex, SECRET_HEX_BYTES, "secret key")?;
     let salt = fixed_bytes::<SALT_BYTES>(salt_random, "salt")?;
     let nonce = fixed_bytes::<NONCE_BYTES>(nonce_random, "private key nonce")?;
     let storage_key = derive_storage_key(passphrase, &salt);
     let cipher = ChaCha20Poly1305::new(Key::from_slice(&storage_key));
     let ciphertext = cipher
-        .encrypt(Nonce::from_slice(&nonce), private_key.as_ref())
+        .encrypt(Nonce::from_slice(&nonce), secret_hex.as_bytes())
         .map_err(|_| "failed to protect private key".to_string())?;
 
     Ok(format!(
@@ -131,7 +154,7 @@ fn protect_private_key_inner(
     ))
 }
 
-fn unlock_private_key_inner(protected_private_key: &str, passphrase: &str) -> Result<Vec<u8>, String> {
+fn unlock_secret_hex(protected_private_key: &str, passphrase: &str) -> Result<String, String> {
     require_passphrase(passphrase)?;
     let parts = split_envelope(protected_private_key, PRIVATE_PREFIX, 4)?;
     let salt = fixed_bytes::<SALT_BYTES>(&decode(parts[2])?, "stored salt")?;
@@ -139,76 +162,32 @@ fn unlock_private_key_inner(protected_private_key: &str, passphrase: &str) -> Re
     let ciphertext = decode(parts[4])?;
     let storage_key = derive_storage_key(passphrase, &salt);
     let cipher = ChaCha20Poly1305::new(Key::from_slice(&storage_key));
-
-    cipher
-        .decrypt(Nonce::from_slice(&nonce), ciphertext.as_ref())
-        .map_err(|_| "failed to unlock private key".to_string())
-}
-
-fn encrypt_message_inner(
-    recipient_public_key: &str,
-    plaintext: &str,
-    ephemeral_random: &[u8],
-    nonce_random: &[u8],
-) -> Result<String, String> {
-    let recipient_public = parse_public_key(recipient_public_key)?;
-    let ephemeral_private = fixed_bytes::<KEY_BYTES>(ephemeral_random, "ephemeral randomness")?;
-    let nonce = fixed_bytes::<NONCE_BYTES>(nonce_random, "message nonce")?;
-    let ephemeral_secret = StaticSecret::from(ephemeral_private);
-    let ephemeral_public = PublicKey::from(&ephemeral_secret);
-    let shared_secret = ephemeral_secret.diffie_hellman(&recipient_public);
-    let message_key = derive_message_key(shared_secret.as_bytes(), ephemeral_public.as_bytes(), recipient_public.as_bytes())?;
-    let cipher = ChaCha20Poly1305::new(Key::from_slice(&message_key));
-    let ciphertext = cipher
-        .encrypt(Nonce::from_slice(&nonce), plaintext.as_bytes())
-        .map_err(|_| "failed to encrypt message".to_string())?;
-
-    Ok(format!(
-        "{}:{}:{}:{}",
-        MESSAGE_PREFIX,
-        encode(ephemeral_public.as_bytes()),
-        encode(&nonce),
-        encode(&ciphertext)
-    ))
-}
-
-fn decrypt_message_inner(
-    protected_private_key: &str,
-    passphrase: &str,
-    encrypted_message: &str,
-) -> Result<String, String> {
-    let private_key = fixed_bytes::<KEY_BYTES>(
-        &unlock_private_key_inner(protected_private_key, passphrase)?,
-        "unlocked private key",
-    )?;
-    let secret = StaticSecret::from(private_key);
-    let recipient_public = PublicKey::from(&secret);
-    let parts = split_envelope(encrypted_message, MESSAGE_PREFIX, 4)?;
-    let ephemeral_public = PublicKey::from(fixed_bytes::<KEY_BYTES>(
-        &decode(parts[2])?,
-        "ephemeral public key",
-    )?);
-    let nonce = fixed_bytes::<NONCE_BYTES>(&decode(parts[3])?, "message nonce")?;
-    let ciphertext = decode(parts[4])?;
-    let shared_secret = secret.diffie_hellman(&ephemeral_public);
-    let message_key = derive_message_key(shared_secret.as_bytes(), ephemeral_public.as_bytes(), recipient_public.as_bytes())?;
-    let cipher = ChaCha20Poly1305::new(Key::from_slice(&message_key));
     let plaintext = cipher
         .decrypt(Nonce::from_slice(&nonce), ciphertext.as_ref())
-        .map_err(|_| "failed to decrypt message".to_string())?;
+        .map_err(|_| "failed to unlock private key".to_string())?;
+    let secret_hex =
+        String::from_utf8(plaintext).map_err(|_| "stored private key is damaged".to_string())?;
 
-    String::from_utf8(plaintext).map_err(|_| "decrypted message is not valid UTF-8".to_string())
+    require_hex(&secret_hex, SECRET_HEX_BYTES, "stored secret key")?;
+    Ok(secret_hex)
 }
 
-fn parse_public_key(public_key: &str) -> Result<PublicKey, String> {
+fn engine_hex_to_public_key(public_hex: &str) -> Result<String, String> {
+    let bytes = hex_to_bytes(public_hex, KEY_BYTES, "public key")?;
+    Ok(format!("{}:{}", PUBLIC_PREFIX, encode(&bytes)))
+}
+
+fn public_key_to_engine_hex(public_key: &str) -> Result<String, String> {
     let parts = split_envelope(public_key, PUBLIC_PREFIX, 2)?;
-    Ok(PublicKey::from(fixed_bytes::<KEY_BYTES>(
-        &decode(parts[2])?,
-        "public key",
-    )?))
+    let bytes = fixed_bytes::<KEY_BYTES>(&decode(parts[2])?, "public key")?;
+    Ok(bytes_to_hex(&bytes))
 }
 
-fn split_envelope<'a>(value: &'a str, expected_prefix: &str, expected_parts: usize) -> Result<Vec<&'a str>, String> {
+fn split_envelope<'a>(
+    value: &'a str,
+    expected_prefix: &str,
+    expected_parts: usize,
+) -> Result<Vec<&'a str>, String> {
     let parts = value.trim().split(':').collect::<Vec<_>>();
     if parts.len() != expected_parts + 1 {
         return Err("invalid envelope format".to_string());
@@ -222,24 +201,6 @@ fn split_envelope<'a>(value: &'a str, expected_prefix: &str, expected_parts: usi
     Ok(parts)
 }
 
-fn derive_storage_key(passphrase: &str, salt: &[u8; SALT_BYTES]) -> [u8; KEY_BYTES] {
-    let mut key = [0_u8; KEY_BYTES];
-    pbkdf2_hmac::<Sha256>(passphrase.as_bytes(), salt, PBKDF2_ROUNDS, &mut key);
-    key
-}
-
-fn derive_message_key(
-    shared_secret: &[u8],
-    ephemeral_public: &[u8],
-    recipient_public: &[u8],
-) -> Result<[u8; KEY_BYTES], String> {
-    let hk = Hkdf::<Sha256>::new(Some(b"stegosavr-message-v1"), shared_secret);
-    let mut output = [0_u8; KEY_BYTES];
-    hk.expand_multi_info(&[ephemeral_public, recipient_public], &mut output)
-        .map_err(|_| "failed to derive message key".to_string())?;
-    Ok(output)
-}
-
 fn require_passphrase(passphrase: &str) -> Result<(), String> {
     if passphrase.is_empty() {
         return Err("passphrase is required".to_string());
@@ -248,10 +209,47 @@ fn require_passphrase(passphrase: &str) -> Result<(), String> {
     Ok(())
 }
 
+fn require_hex(value: &str, expected_len: usize, name: &str) -> Result<(), String> {
+    if value.len() != expected_len || !value.chars().all(|character| character.is_ascii_hexdigit())
+    {
+        return Err(format!(
+            "{name} must be {expected_len} hexadecimal characters"
+        ));
+    }
+
+    Ok(())
+}
+
+fn hex_to_bytes(hex: &str, expected_bytes: usize, name: &str) -> Result<Vec<u8>, String> {
+    require_hex(hex, expected_bytes * 2, name)?;
+    (0..hex.len())
+        .step_by(2)
+        .map(|index| {
+            u8::from_str_radix(&hex[index..index + 2], 16)
+                .map_err(|_| format!("invalid {name} hex"))
+        })
+        .collect()
+}
+
+fn bytes_to_hex(bytes: &[u8]) -> String {
+    let mut output = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        output.push(char::from_digit((byte >> 4) as u32, 16).expect("hex digit"));
+        output.push(char::from_digit((byte & 0x0f) as u32, 16).expect("hex digit"));
+    }
+    output
+}
+
 fn fixed_bytes<const N: usize>(bytes: &[u8], name: &str) -> Result<[u8; N], String> {
     bytes
         .try_into()
-        .map_err(|_| format!("{} must be {} bytes", name, N))
+        .map_err(|_| format!("{name} must be {N} bytes"))
+}
+
+fn derive_storage_key(passphrase: &str, salt: &[u8; SALT_BYTES]) -> [u8; KEY_BYTES] {
+    let mut key = [0_u8; KEY_BYTES];
+    pbkdf2_hmac::<Sha256>(passphrase.as_bytes(), salt, PBKDF2_ROUNDS, &mut key);
+    key
 }
 
 fn encode(bytes: &[u8]) -> String {
@@ -264,49 +262,115 @@ fn decode(value: &str) -> Result<Vec<u8>, String> {
         .map_err(|_| "invalid base64 payload".to_string())
 }
 
+fn to_json<T: Serialize>(value: &T) -> Result<String, String> {
+    serde_json::to_string(value).map_err(|_| "failed to encode response".to_string())
+}
+
+fn throw_message(message: String) -> JsValue {
+    let error = js_sys::Error::new(&message);
+    error.into()
+}
+
+fn throw_engine(error: EngineError) -> JsValue {
+    let name = match &error {
+        EngineError::EmptyMessage => "EmptyMessage",
+        EngineError::MessageTooLong { .. } => "MessageTooLong",
+        EngineError::UnsupportedCharacter { .. } => "UnsupportedCharacter",
+        EngineError::NoMessageFound => "NoMessageFound",
+        EngineError::CarrierUnsuitable { .. } => "CarrierUnsuitable",
+        EngineError::DecryptionFailed => "DecryptionFailed",
+        EngineError::Encryption => "Encryption",
+        EngineError::InvalidKey { .. } => "InvalidKey",
+        EngineError::Image(_) => "ImageError",
+        _ => "Error",
+    };
+    let js_error = js_sys::Error::new(&error.to_string());
+    js_error.set_name(name);
+    js_error.into()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    const KEY_RANDOM: [u8; 32] = [7; 32];
     const SALT_RANDOM: [u8; 16] = [3; 16];
     const PRIVATE_NONCE: [u8; 12] = [5; 12];
-    const EPHEMERAL_RANDOM: [u8; 32] = [11; 32];
-    const MESSAGE_NONCE: [u8; 12] = [13; 12];
 
     #[test]
-    fn generates_key_pair_with_envelopes() {
-        let json = generate_key_pair_inner("passphrase", &KEY_RANDOM, &SALT_RANDOM, &PRIVATE_NONCE).unwrap();
+    fn converts_public_key_between_engine_hex_and_stegosavr_format() {
+        let public_hex = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f";
+        let public_key = engine_hex_to_public_key(public_hex).unwrap();
 
-        assert!(json.contains(PUBLIC_PREFIX));
-        assert!(json.contains(PRIVATE_PREFIX));
+        assert_eq!(public_key_to_engine_hex(&public_key).unwrap(), public_hex);
     }
 
     #[test]
-    fn encrypts_and_decrypts_round_trip() {
-        let json = generate_key_pair_inner("passphrase", &KEY_RANDOM, &SALT_RANDOM, &PRIVATE_NONCE).unwrap();
+    fn protects_and_unlocks_secret_hex() {
+        let secret_hex = "1111111111111111111111111111111111111111111111111111111111111111";
+        let protected =
+            protect_secret_hex(secret_hex, "passphrase", &SALT_RANDOM, &PRIVATE_NONCE).unwrap();
+
+        assert!(protected.starts_with("STEGOSAVR-PRIVATE:v2:"));
+        assert_eq!(
+            unlock_secret_hex(&protected, "passphrase").unwrap(),
+            secret_hex
+        );
+        assert!(unlock_secret_hex(&protected, "wrong").is_err());
+    }
+
+    #[test]
+    fn generates_key_pair_with_stegosavr_envelopes() {
+        let json = generate_key_pair_inner("passphrase", &SALT_RANDOM, &PRIVATE_NONCE).unwrap();
+        let generated: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+        assert!(generated["publicKey"]
+            .as_str()
+            .unwrap()
+            .starts_with("STEGOSAVR-PUBLIC:v1:"));
+        assert!(generated["protectedPrivateKey"]
+            .as_str()
+            .unwrap()
+            .starts_with("STEGOSAVR-PRIVATE:v2:"));
+    }
+
+    #[test]
+    fn rejects_old_private_key_envelope() {
+        assert!(
+            unlock_secret_hex("STEGOSAVR-PRIVATE:v1:salt:nonce:ciphertext", "passphrase").is_err()
+        );
+    }
+
+    #[test]
+    fn adapter_image_round_trip_uses_protected_key() {
+        let json = generate_key_pair_inner("passphrase", &SALT_RANDOM, &PRIVATE_NONCE).unwrap();
         let generated: serde_json::Value = serde_json::from_str(&json).unwrap();
         let public_key = generated["publicKey"].as_str().unwrap();
-        let private_key = generated["protectedPrivateKey"].as_str().unwrap();
-        let message = encrypt_message_inner(public_key, "hello from wasm", &EPHEMERAL_RANDOM, &MESSAGE_NONCE).unwrap();
-        let decrypted = decrypt_message_inner(private_key, "passphrase", &message).unwrap();
+        let protected_private_key = generated["protectedPrivateKey"].as_str().unwrap();
+        let image = first_suitable_vendor_image();
 
-        assert_eq!(decrypted, "hello from wasm");
+        let encoded = encode_image_inner(&image, public_key, "hello there").unwrap();
+        let decoded = decode_image_inner(&encoded, protected_private_key, "passphrase").unwrap();
+
+        assert_eq!(decoded, "hello there");
     }
 
-    #[test]
-    fn rejects_incorrect_passphrase() {
-        let json = generate_key_pair_inner("passphrase", &KEY_RANDOM, &SALT_RANDOM, &PRIVATE_NONCE).unwrap();
-        let generated: serde_json::Value = serde_json::from_str(&json).unwrap();
-        let private_key = generated["protectedPrivateKey"].as_str().unwrap();
+    fn first_suitable_vendor_image() -> Vec<u8> {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../vendor/mytischtschi/test-vectors/images");
+        let mut paths = std::fs::read_dir(dir)
+            .unwrap()
+            .filter_map(|entry| entry.ok().map(|entry| entry.path()))
+            .collect::<Vec<_>>();
+        paths.sort();
 
-        assert!(unlock_private_key_inner(private_key, "wrong").is_err());
-    }
-
-    #[test]
-    fn rejects_invalid_public_key() {
-        let result = encrypt_message_inner("not-a-key", "hello", &EPHEMERAL_RANDOM, &MESSAGE_NONCE);
-
-        assert!(result.is_err());
+        paths
+            .into_iter()
+            .filter_map(|path| std::fs::read(path).ok())
+            .find(|bytes| {
+                mytischtschi::inspect_carrier(bytes)
+                    .map(|report| report.suitable)
+                    .unwrap_or(false)
+            })
+            .expect("vendored test vectors should include a suitable image")
     }
 }

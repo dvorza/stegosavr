@@ -12,10 +12,10 @@
   "scripts": {
     "dev": "npm run build:wasm && vite",
     "build": "npm run build:wasm && tsc && vite build",
-    "build:wasm": "wasm-pack build wasm-crypto --target web --out-dir ../src/wasm --release",
+    "build:wasm": "PATH=\"$HOME/.cargo/bin:$PATH\" wasm-pack build wasm-crypto --target web --out-dir ../src/wasm --release",
     "preview": "vite preview",
     "test": "npm run test:wasm && npm run build:wasm && vitest run",
-    "test:wasm": "cargo test --manifest-path wasm-crypto/Cargo.toml",
+    "test:wasm": "PATH=\"$HOME/.cargo/bin:$PATH\" cargo test --manifest-path wasm-crypto/Cargo.toml",
     "test:watch": "vitest"
   },
   "devDependencies": {

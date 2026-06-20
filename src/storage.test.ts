@@ -21,15 +21,30 @@ describe("key storage", () => {
     saveStoredKeyPair(
       {
         publicKey: "STEGOSAVR-PUBLIC:v1:abc",
-        protectedPrivateKey: "STEGOSAVR-PRIVATE:v1:salt:nonce:ciphertext",
+        protectedPrivateKey: "STEGOSAVR-PRIVATE:v2:salt:nonce:ciphertext",
       },
       storage,
     );
 
     expect(readStoredKeyPair(storage)).toEqual({
       publicKey: "STEGOSAVR-PUBLIC:v1:abc",
-      protectedPrivateKey: "STEGOSAVR-PRIVATE:v1:salt:nonce:ciphertext",
+      protectedPrivateKey: "STEGOSAVR-PRIVATE:v2:salt:nonce:ciphertext",
     });
     expect(hasStoredKeyPair(storage)).toBe(true);
+  });
+
+  it("ignores old private-key envelopes", () => {
+    const storage = createMemoryStorage();
+
+    saveStoredKeyPair(
+      {
+        publicKey: "STEGOSAVR-PUBLIC:v1:abc",
+        protectedPrivateKey: "STEGOSAVR-PRIVATE:v1:salt:nonce:ciphertext",
+      },
+      storage,
+    );
+
+    expect(readStoredKeyPair(storage)).toBeNull();
+    expect(hasStoredKeyPair(storage)).toBe(false);
   });
 });
