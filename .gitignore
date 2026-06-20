@@ -3,5 +3,10 @@ dist
 coverage
 wasm-crypto/target
 .DS_Store
+# IDEs and Agents
 .claude/
 .idea/
+
+# Chrome extension build artifacts
+extensions/chrome/dist
+extensions/chrome/src/wasm

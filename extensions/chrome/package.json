@@ -1,0 +1,21 @@
+{
+  "name": "stegosavr-extension-chrome",
+  "version": "0.0.1",
+  "description": "Stegosavr Chrome extension — client-side PGP-style message encryption",
+  "type": "module",
+  "scripts": {
+    "dev": "npm run build:wasm && vite",
+    "build": "npm run build:wasm && tsc && vite build && cp manifest.json dist/",
+    "build:wasm": "wasm-pack build wasm-crypto --target web --out-dir ../src/wasm --release",
+    "preview": "vite preview",
+    "test": "npm run test:wasm && npm run build:wasm && vitest run",
+    "test:wasm": "cargo test --manifest-path wasm-crypto/Cargo.toml",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16",
+    "vitest": "^4.1.9",
+    "wasm-pack": "^0.15.0"
+  }
+}
