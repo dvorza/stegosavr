@@ -10,6 +10,7 @@ import {
 import { formatPublicKey, listPublicKeyDisplayFormats } from "./mnemonic/public-key";
 import { readStoredKeyPair, saveStoredKeyPair, type StoredKeyPair } from "./storage";
 import { formatEncryptedMessage, listEncryptedMessageDisplayFormats } from "./styled/messages";
+import { registerServiceWorker } from "./service-worker";
 
 type Tab = "key" | "encrypt" | "decrypt" | "generate-meme" | "read-meme";
 
@@ -740,3 +741,4 @@ function escapeHtml(value: string): string {
 }
 
 render();
+registerServiceWorker();

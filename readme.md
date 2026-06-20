@@ -126,6 +126,22 @@ browsers, malicious browser extensions, XSS, compromised dependencies, or lost
 browser storage. Messages and keys use an application-specific PGP-style format,
 not OpenPGP or GPG compatibility.
 
+## Install and Offline Use
+
+Stegosavr is installable as a Progressive Web App on browsers that support PWA
+installation. Open the deployed GitHub Pages URL, then use the browser install
+action:
+
+- Chrome and Edge on desktop usually show an install action in the address bar or browser menu.
+- Android browsers usually expose install from the browser menu.
+- Safari on iOS uses Share -> Add to Home Screen.
+
+After the first successful online load, the service worker caches the app shell
+and same-origin build assets, including JavaScript, CSS, and WebAssembly files.
+The installed app can then reopen offline and continue using local key, text, and
+meme workflows. Offline use is not guaranteed before the first complete online
+load, and install prompts vary by browser and platform.
+
 ## Scripts
 
 - `npm run dev` starts the local development server.
