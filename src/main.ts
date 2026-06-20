@@ -43,10 +43,11 @@ function render(): void {
   app.innerHTML = `
     <section class="app-panel" aria-labelledby="app-title">
       <header class="hero">
-        <p class="eyebrow">Browser-only encryption</p>
-        <h1 id="app-title">Stegosavr</h1>
+        <p class="eyebrow">Потный вал вдохновенья</p>
+        <h1 id="app-title">Остапа несло</h1>
         <p class="lede">
-          Generate a local key pair, share your public key, and exchange PGP-style encrypted messages.
+НЕЗАМЕНИМОЕ ПОСОБИЕ ДЛЯ СОЧИНЕНИЯ ЮБИЛЕЙНЫХ СТАТЕЙ,
+ТАБЕЛЬНЫХ ФЕЛЬЕТОНОВ, А ТАКЖЕ ПАРАДНЫХ СТИХОТВОРЕНИЙ. ОД И ТРОПАРЕЙ
         </p>
       </header>
 
