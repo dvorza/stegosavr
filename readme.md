@@ -10,7 +10,8 @@ The app lets a user:
 - copy the public key as a raw key, token-grid mnemonic phrase, or grammar mnemonic text;
 - encrypt a text message for another user's raw or mnemonic Stegosavr public key;
 - copy encrypted output as a raw message or styled grammar text;
-- decrypt a raw or styled Stegosavr encrypted message with the stored private key and passphrase.
+- decrypt a raw or styled Stegosavr encrypted message with the stored private key and passphrase;
+- preview planned meme transport workflows for future PNG-based message carriers.
 
 ## Public Key Formats
 
@@ -83,6 +84,13 @@ encrypted message. Styled encrypted messages must be copied exactly; changing
 encoded words or removing chunks makes the envelope checksum fail. Built-in
 styles use fictional or abstract vocabulary; they are reversible display formats,
 not factual statements.
+
+## Meme Transport Preview
+
+The app includes `Generate Meme` and `Read Meme` tabs as placeholders for planned
+PNG-based encrypted message transport. These views show the intended workflow,
+but they do not encode images, decode images, export PNG files, or change
+encrypted messages yet.
 
 ## Security Model
 

@@ -5,7 +5,7 @@ import { formatPublicKey, listPublicKeyDisplayFormats } from "./mnemonic/public-
 import { readStoredKeyPair, saveStoredKeyPair, type StoredKeyPair } from "./storage";
 import { formatEncryptedMessage, listEncryptedMessageDisplayFormats } from "./styled/messages";
 
-type Tab = "key" | "encrypt" | "decrypt";
+type Tab = "key" | "encrypt" | "decrypt" | "generate-meme" | "read-meme";
 
 interface AppState {
   activeTab: Tab;
@@ -53,8 +53,10 @@ function render(): void {
 
       <nav class="tabs" aria-label="Encryption workflows">
         ${renderTabButton("key", "My key")}
-        ${renderTabButton("encrypt", "Encrypt")}
-        ${renderTabButton("decrypt", "Decrypt")}
+        ${renderTabButton("encrypt", "Encrypt Text")}
+        ${renderTabButton("decrypt", "Decrypt Text")}
+        ${renderTabButton("generate-meme", "Generate Meme")}
+        ${renderTabButton("read-meme", "Read Meme")}
       </nav>
 
       <div class="tab-panel">
@@ -91,7 +93,15 @@ function renderActiveTab(): string {
     return renderEncryptTab();
   }
 
-  return renderDecryptTab();
+  if (state.activeTab === "decrypt") {
+    return renderDecryptTab();
+  }
+
+  if (state.activeTab === "generate-meme") {
+    return renderGenerateMemeTab();
+  }
+
+  return renderReadMemeTab();
 }
 
 function renderKeyTab(): string {
@@ -140,7 +150,7 @@ function renderKeyTab(): string {
 function renderEncryptTab(): string {
   return `
     <section class="workflow" aria-labelledby="encrypt-title">
-      <h2 id="encrypt-title">Encrypt a message</h2>
+      <h2 id="encrypt-title">Encrypt Text</h2>
       <p class="helper">
         Paste the recipient's Stegosavr public key and the message you want only them to read.
       </p>
@@ -165,7 +175,7 @@ function renderDecryptTab(): string {
   if (!state.storedKeyPair) {
     return `
       <section class="workflow" aria-labelledby="decrypt-title">
-        <h2 id="decrypt-title">Decrypt a message</h2>
+        <h2 id="decrypt-title">Decrypt Text</h2>
         <p class="empty-state">Generate your local key before decrypting messages addressed to you.</p>
       </section>
     `;
@@ -173,7 +183,7 @@ function renderDecryptTab(): string {
 
   return `
     <section class="workflow" aria-labelledby="decrypt-title">
-      <h2 id="decrypt-title">Decrypt a message</h2>
+      <h2 id="decrypt-title">Decrypt Text</h2>
       <p class="helper">
         Paste a Stegosavr encrypted message and enter your passphrase to unlock your local private key.
       </p>
@@ -190,6 +200,58 @@ function renderDecryptTab(): string {
       </form>
       ${renderError(state.decryptError)}
       ${renderOutput("Plaintext", state.decryptedMessage)}
+    </section>
+  `;
+}
+
+function renderGenerateMemeTab(): string {
+  return `
+    <section class="workflow" aria-labelledby="generate-meme-title">
+      <h2 id="generate-meme-title">Generate Meme</h2>
+      <p class="helper">
+        Meme transport will turn an existing encrypted message into a PNG-based carrier in a future release.
+        For now, use Encrypt Text to create the encrypted message.
+      </p>
+      <div class="form-grid" aria-describedby="generate-meme-note">
+        <label>
+          PNG image
+          <input type="file" accept="image/png" disabled />
+        </label>
+        <label>
+          Encrypted message
+          <textarea rows="6" disabled placeholder="Paste a STEGOSAVR-MSG:v1 message here when meme generation is available."></textarea>
+        </label>
+        <button type="button" disabled>Generate Meme</button>
+      </div>
+      <p id="generate-meme-note" class="notice" role="status">
+        Coming soon: this placeholder does not encode images, export PNG files, or change encrypted messages.
+      </p>
+    </section>
+  `;
+}
+
+function renderReadMemeTab(): string {
+  return `
+    <section class="workflow" aria-labelledby="read-meme-title">
+      <h2 id="read-meme-title">Read Meme</h2>
+      <p class="helper">
+        Meme reading will extract an encrypted Stegosavr message from a PNG-based carrier in a future release.
+        For now, use Decrypt Text with an encrypted message you already have.
+      </p>
+      <div class="form-grid" aria-describedby="read-meme-note">
+        <label>
+          PNG image
+          <input type="file" accept="image/png" disabled />
+        </label>
+        <label>
+          Extracted encrypted message
+          <textarea rows="6" readonly placeholder="Extracted encrypted messages will appear here when meme reading is available."></textarea>
+        </label>
+        <button type="button" disabled>Read Meme</button>
+      </div>
+      <p id="read-meme-note" class="notice" role="status">
+        Coming soon: this placeholder does not decode images or alter encrypted messages.
+      </p>
     </section>
   `;
 }
