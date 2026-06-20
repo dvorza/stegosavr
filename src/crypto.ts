@@ -5,6 +5,7 @@ import initCrypto, {
 } from "./wasm/stegosavr_crypto";
 import { normalizePublicKeyInput } from "./mnemonic/public-key";
 import { getRandomBytes } from "./random";
+import { normalizeEncryptedMessageInput } from "./styled/messages";
 
 const KEY_RANDOM_BYTES = 32;
 const SALT_RANDOM_BYTES = 16;
@@ -59,7 +60,9 @@ export async function encryptForRecipient(request: EncryptRequest): Promise<stri
 
 export async function decryptStoredMessage(request: DecryptRequest): Promise<string> {
   await ensureCryptoReady();
-  return decryptMessage(request.protectedPrivateKey, request.passphrase, request.encryptedMessage);
+  const encryptedMessage = normalizeEncryptedMessageInput(request.encryptedMessage);
+
+  return decryptMessage(request.protectedPrivateKey, request.passphrase, encryptedMessage);
 }
 
 export function parseGeneratedKeyPair(json: string): GeneratedKeyPair {

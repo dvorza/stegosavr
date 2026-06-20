@@ -9,7 +9,8 @@ The app lets a user:
 - store the public key and protected private key in browser `localStorage`;
 - copy the public key as a raw key, token-grid mnemonic phrase, or grammar mnemonic text;
 - encrypt a text message for another user's raw or mnemonic Stegosavr public key;
-- decrypt a Stegosavr encrypted message with the stored private key and passphrase.
+- copy encrypted output as a raw message or styled grammar text;
+- decrypt a raw or styled Stegosavr encrypted message with the stored private key and passphrase.
 
 ## Public Key Formats
 
@@ -47,6 +48,25 @@ The encrypt page accepts either a raw public key or a supported mnemonic phrase.
 Mnemonic public keys include a checksum, so mistyped or corrupted phrases are
 rejected before encryption. Grammar texts must be copied exactly; editing words,
 punctuation around encoded pairs, or omitting lines can make decoding fail.
+
+## Encrypted Message Formats
+
+The raw `STEGOSAVR-MSG:v1` encrypted message remains the canonical format and is
+the default encrypted output. After encryption, the app can also display the same
+encrypted message as styled grammar text:
+
+```txt
+🚩📰🧵
+Передовая лента
+
+Выпуск 1. Пусть заветный враг, ...
+```
+
+Styled encrypted messages use a variable-length envelope around the canonical
+encrypted message string, then encode that envelope as generated text. The
+decrypt page accepts either the raw encrypted message or a supported styled
+encrypted message. Styled encrypted messages must be copied exactly; changing
+encoded words or removing chunks makes the envelope checksum fail.
 
 ## Security Model
 

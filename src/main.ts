@@ -3,6 +3,7 @@ import { copyText } from "./clipboard";
 import { createKeyPair, decryptStoredMessage, encryptForRecipient } from "./crypto";
 import { formatPublicKey, listPublicKeyDisplayFormats } from "./mnemonic/public-key";
 import { readStoredKeyPair, saveStoredKeyPair, type StoredKeyPair } from "./storage";
+import { formatEncryptedMessage, listEncryptedMessageDisplayFormats } from "./styled/messages";
 
 type Tab = "key" | "encrypt" | "decrypt";
 
@@ -13,6 +14,7 @@ interface AppState {
   publicKeyFormat: string;
   encryptError: string;
   encryptedMessage: string;
+  encryptedMessageFormat: string;
   decryptError: string;
   decryptedMessage: string;
 }
@@ -32,6 +34,7 @@ const state: AppState = {
   publicKeyFormat: "raw",
   encryptError: "",
   encryptedMessage: "",
+  encryptedMessageFormat: "raw",
   decryptError: "",
   decryptedMessage: "",
 };
@@ -152,7 +155,7 @@ function renderEncryptTab(): string {
         <button type="submit">Encrypt message</button>
       </form>
       ${renderError(state.encryptError)}
-      ${renderOutput("Encrypted message", state.encryptedMessage, "encrypted-message")}
+      ${renderEncryptedOutput()}
     </section>
   `;
 }
@@ -206,6 +209,28 @@ function renderOutput(label: string, value: string, copyId?: string): string {
   `;
 }
 
+function renderEncryptedOutput(): string {
+  if (!state.encryptedMessage) {
+    return "";
+  }
+
+  return `
+    <div class="output">
+      <div class="output-header">
+        <h3>Encrypted message</h3>
+        <button type="button" data-copy="encrypted-message">Copy</button>
+      </div>
+      <label>
+        Encrypted message format
+        <select name="encryptedMessageFormat" data-encrypted-message-format>
+          ${renderEncryptedMessageFormatOptions()}
+        </select>
+      </label>
+      <textarea readonly rows="7">${escapeHtml(getSelectedEncryptedMessageRepresentation())}</textarea>
+    </div>
+  `;
+}
+
 function renderNotice(message: string): string {
   return message ? `<p class="notice" role="status">${escapeHtml(message)}</p>` : "";
 }
@@ -228,11 +253,12 @@ function bindActiveTab(): void {
   app.querySelector<HTMLFormElement>('[data-form="encrypt"]')?.addEventListener("submit", handleEncryptSubmit);
   app.querySelector<HTMLFormElement>('[data-form="decrypt"]')?.addEventListener("submit", handleDecryptSubmit);
   app.querySelector<HTMLSelectElement>("[data-public-key-format]")?.addEventListener("change", handlePublicKeyFormatChange);
+  app.querySelector<HTMLSelectElement>("[data-encrypted-message-format]")?.addEventListener("change", handleEncryptedMessageFormatChange);
   app.querySelector<HTMLButtonElement>('[data-copy="public-key"]')?.addEventListener("click", () => {
     void handleCopy(getSelectedPublicKeyRepresentation(), "Public key copied.");
   });
   app.querySelector<HTMLButtonElement>('[data-copy="encrypted-message"]')?.addEventListener("click", () => {
-    void handleCopy(state.encryptedMessage, "Encrypted message copied.");
+    void handleCopy(getSelectedEncryptedMessageRepresentation(), "Encrypted message copied.");
   });
 }
 
@@ -254,6 +280,26 @@ function getSelectedPublicKeyRepresentation(): string {
   }
 
   return formatPublicKey(state.storedKeyPair.publicKey, state.publicKeyFormat);
+}
+
+function renderEncryptedMessageFormatOptions(): string {
+  return listEncryptedMessageDisplayFormats()
+    .map(
+      (format) => `
+        <option value="${format.id}" ${state.encryptedMessageFormat === format.id ? "selected" : ""}>
+          ${format.label}
+        </option>
+      `,
+    )
+    .join("");
+}
+
+function getSelectedEncryptedMessageRepresentation(): string {
+  if (!state.encryptedMessage) {
+    return "";
+  }
+
+  return formatEncryptedMessage(state.encryptedMessage, state.encryptedMessageFormat);
 }
 
 async function handleKeySubmit(event: SubmitEvent): Promise<void> {
@@ -304,6 +350,7 @@ async function handleEncryptSubmit(event: SubmitEvent): Promise<void> {
 
   try {
     state.encryptedMessage = await encryptForRecipient({ recipientPublicKey, plaintext });
+    state.encryptedMessageFormat = "raw";
   } catch {
     state.encryptError = "Encryption failed. The recipient public key could not be decoded.";
   }
@@ -315,6 +362,12 @@ function handlePublicKeyFormatChange(event: Event): void {
   const select = event.currentTarget as HTMLSelectElement;
   state.publicKeyFormat = select.value;
   state.keyMessage = "";
+  render();
+}
+
+function handleEncryptedMessageFormatChange(event: Event): void {
+  const select = event.currentTarget as HTMLSelectElement;
+  state.encryptedMessageFormat = select.value;
   render();
 }
 
