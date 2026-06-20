@@ -114,7 +114,7 @@ describe("mnemonic public key format", () => {
   });
 
   it("rejects birthday greeting text with a checksum mismatch", () => {
-    const text = formatPublicKey(rawPublicKey, "birthday-toast-ru").replace("бодрый ветер", "верный ветер");
+    const text = formatPublicKey(rawPublicKey, "birthday-toast-ru").replace("бодрая встреча", "верная встреча");
 
     expect(() => decodeGrammarPublicKey(text)).toThrow("checksum");
   });

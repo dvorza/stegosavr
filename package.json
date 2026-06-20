@@ -1,6 +1,6 @@
 {
   "name": "stegosavr",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "A small vanilla TypeScript single page app.",
   "repository": {
     "type": "git",
