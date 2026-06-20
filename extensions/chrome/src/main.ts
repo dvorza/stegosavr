@@ -3,7 +3,10 @@ import { copyText } from "./clipboard";
 import { formatPublicKey, listPublicKeyDisplayFormats } from "./mnemonic/public-key";
 import { readStoredKeyPair, saveStoredKeyPair, type StoredKeyPair } from "./storage";
 import { formatEncryptedMessage, listEncryptedMessageDisplayFormats } from "./styled/messages";
-import { VERSION } from "./version";
+
+// Extension version — read from package.json at build time
+// @ts-ignore — JSON import resolved by Vite
+import { version as VERSION } from "../package.json";
 
 type Tab = "key" | "encrypt" | "decrypt";
 

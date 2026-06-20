@@ -2,8 +2,8 @@
 # ============================================================
 # Stegosavr Chrome Extension — Docker Build Script
 # ============================================================
-# Builds the extension inside a Docker container and produces
-# a dist/ folder ready to load into Chrome.
+# Builds the extension inside a Docker container using the root
+# project's source files. Run from extensions/chrome/.
 #
 # Usage:
 #   ./build.sh          # build the extension
@@ -15,36 +15,42 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-cd "$SCRIPT_DIR"
+ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
+# Clean previous build artifacts
 if [[ "${1:-}" == "--clean" ]]; then
-  echo "🧹 Cleaning dist/..."
-  rm -rf dist
+  echo "🧹 Cleaning dist/ and zips..."
+  rm -rf "$SCRIPT_DIR/dist"
+  rm -f "$SCRIPT_DIR"/../stegosavr-chrome-*.zip
 fi
 
+cd "$ROOT_DIR"
+
+# Sync manifest.json version from package.json
+PKG_VERSION=$(grep -o '"version"[[:space:]]*:[[:space:]]*"[^"]*"' "$SCRIPT_DIR/package.json" | grep -o '[0-9][0-9.]*')
+sed -i '' "s/\"version\"[[:space:]]*:[[:space:]]*\"[^\"]*\"/\"version\": \"${PKG_VERSION}\"/" "$SCRIPT_DIR/manifest.json"
+echo "📋 Synced manifest.json version → ${PKG_VERSION}"
+
 echo "🐳 Building Docker image..."
-docker build -t stegosavr-ext -f Dockerfile .
+docker build -t stegosavr-ext -f extensions/chrome/Dockerfile .
 
 echo "📦 Extracting dist/ from container..."
-# Run the container with dist/ mounted to the host.
-# The Dockerfile already ran `npm run build`, so dist/ exists inside.
-# We copy it out via a temp container.
 docker run --rm -v "$SCRIPT_DIR/dist:/output" stegosavr-ext \
   sh -c "cp -r /app/dist/* /output/"
 
-# Read version from package.json (works without node on host)
-VERSION=$(grep -o '"version"[[:space:]]*:[[:space:]]*"[^"]*"' package.json | grep -o '[0-9][0-9.]*')
+# Read version from extension package.json
+VERSION=$(grep -o '"version"[[:space:]]*:[[:space:]]*"[^"]*"' "$SCRIPT_DIR/package.json" | grep -o '[0-9][0-9.]*')
 ZIP_NAME="stegosavr-chrome-v${VERSION}.zip"
 
 echo "📦 Creating ${ZIP_NAME}..."
-cd dist
-zip -r "../../${ZIP_NAME}" . --exclude ".*" --exclude "__MACOSX"
-cd ..
+cd "$SCRIPT_DIR/dist"
+zip -r "$SCRIPT_DIR/../${ZIP_NAME}" . --exclude ".*" --exclude "__MACOSX"
+cd "$ROOT_DIR"
 
 echo ""
 echo "✅ Build complete."
 echo "   Extension folder : $SCRIPT_DIR/dist/"
-echo "   Extension zip   : $(dirname "$SCRIPT_DIR")/${ZIP_NAME}"
+echo "   Extension zip   : $SCRIPT_DIR/../${ZIP_NAME}"
 echo ""
 echo "To install in Chrome:"
 echo "  1. Open chrome://extensions"
