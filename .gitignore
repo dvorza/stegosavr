@@ -1,6 +1,8 @@
 node_modules
 dist
 coverage
+docker/
+.dockerignore
 wasm-crypto/target
 .DS_Store
 # IDEs and Agents

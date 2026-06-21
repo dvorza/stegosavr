@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { FormEvent, JSX } from "react";
 import { renderCaptions } from "./canvas-caption";
+import QRCode from "qrcode";
 import { copyText } from "./clipboard";
 import {
   analyzePlaintextMessage,
@@ -149,6 +150,31 @@ function KeyTab({
   const [passphrase, setPassphrase] = useState("");
   const publicKeyFormats = useMemo(() => listPublicKeyDisplayFormats(), []);
   const selectedPublicKey = storedKeyPair ? formatPublicKey(storedKeyPair.publicKey, publicKeyFormat) : "";
+  const qrCodeRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const container = qrCodeRef.current;
+    if (!container || !storedKeyPair) {
+      return;
+    }
+
+    container.innerHTML = "";
+
+    const canvas = document.createElement("canvas");
+    container.appendChild(canvas);
+
+    QRCode.toCanvas(canvas, storedKeyPair.publicKey, {
+      errorCorrectionLevel: "L",
+      margin: 1,
+      width: 180,
+      color: {
+        dark: "#172018",
+        light: "#f6f8f2",
+      },
+    }).catch(() => {
+      container.textContent = "QR generation failed";
+    });
+  }, [storedKeyPair]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -229,7 +255,10 @@ function KeyTab({
           ))}
         </select>
       </label>
-      <textarea readOnly rows={8} value={selectedPublicKey} />
+      <div className="key-display">
+        <textarea readOnly rows={8} value={selectedPublicKey} />
+        <div className="qr-code" ref={qrCodeRef} />
+      </div>
       <div className="actions">
         <button type="button" onClick={() => void handleCopy()}>
           Copy public key
