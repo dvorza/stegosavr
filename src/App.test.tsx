@@ -40,24 +40,20 @@ describe("App", () => {
     localStorage.clear();
   });
 
-  it("renders the React tab shell and switches workflows", async () => {
-    const user = userEvent.setup();
+  it("renders Encode Image as the primary workflow without equal workflow tabs", () => {
     render(<App />);
 
-    expect(screen.getByRole("heading", { name: "Create your local key" })).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Encode Image" }));
     expect(screen.getByRole("heading", { name: "Encode Image" })).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Read Image" }));
-    expect(screen.getByText("Generate your local key before reading image messages addressed to you.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sign Up" })).toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "Image message workflows" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "My key" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Read Image" })).not.toBeInTheDocument();
   });
 
   it("updates message budget without replacing the focused message field", async () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.click(screen.getByRole("button", { name: "Encode Image" }));
     const messageInput = screen.getByLabelText("Message");
     await user.type(messageInput, "hello");
 
@@ -77,7 +73,6 @@ describe("App", () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.click(screen.getByRole("button", { name: "Encode Image" }));
     const messageInput = screen.getByLabelText("Message");
     await user.type(messageInput, "hello");
 
@@ -89,6 +84,7 @@ describe("App", () => {
     const user = userEvent.setup();
     render(<App />);
 
+    await user.click(screen.getByRole("button", { name: "Sign Up" }));
     await user.type(screen.getByLabelText("Passphrase"), "secret");
     await user.click(screen.getByRole("button", { name: "Generate key" }));
     await screen.findByRole("heading", { name: "Your public key" });
@@ -100,5 +96,63 @@ describe("App", () => {
     await screen.findByText("Public key copied.");
     expect(formatSelect).toHaveValue("standard");
     expect(copyText).toHaveBeenCalled();
+  });
+
+  it("transitions from Sign Up to Account and reveals Read Image after key creation", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    expect(screen.getByRole("button", { name: "Sign Up" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Read Image" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Sign Up" }));
+    expect(screen.getByRole("dialog", { name: "Sign Up" })).toBeInTheDocument();
+    await user.type(screen.getByLabelText("Passphrase"), "secret");
+    await user.click(screen.getByRole("button", { name: "Generate key" }));
+
+    await screen.findByRole("dialog", { name: "Account" });
+    expect(screen.getByRole("button", { name: "Account" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Read Image" })).toBeInTheDocument();
+  });
+
+  it("requires explicit modal close and keeps Encode Image state while modals open", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    const messageInput = screen.getByLabelText("Message");
+    await user.type(messageInput, "hello");
+    await screen.findByText(/5\/160 characters/);
+
+    await user.click(screen.getByRole("button", { name: "Sign Up" }));
+    expect(screen.getByRole("dialog", { name: "Sign Up" })).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("modal-backdrop"));
+    expect(screen.getByRole("dialog", { name: "Sign Up" })).toBeInTheDocument();
+    expect(messageInput).toHaveValue("hello");
+
+    await user.click(screen.getByRole("button", { name: "Close Sign Up" }));
+    expect(screen.queryByRole("dialog", { name: "Sign Up" })).not.toBeInTheDocument();
+    expect(messageInput).toHaveValue("hello");
+  });
+
+  it("opens Read Image from the header after signup and resets modal-local form state after close", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: "Sign Up" }));
+    await user.type(screen.getByLabelText("Passphrase"), "secret");
+    await user.click(screen.getByRole("button", { name: "Generate key" }));
+    await user.click(await screen.findByRole("button", { name: "Close Account" }));
+
+    await user.click(screen.getByRole("button", { name: "Read Image" }));
+    expect(screen.getByRole("dialog", { name: "Read Image" })).toBeInTheDocument();
+    await user.type(screen.getByLabelText("Passphrase"), "secret");
+    expect(screen.getByLabelText("Passphrase")).toHaveValue("secret");
+
+    await user.click(screen.getByRole("button", { name: "Close Read Image" }));
+    expect(screen.queryByRole("dialog", { name: "Read Image" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Read Image" }));
+    expect(screen.getByLabelText("Passphrase")).toHaveValue("");
   });
 });

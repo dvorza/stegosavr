@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { FormEvent, JSX } from "react";
 import { copyText } from "./clipboard";
 import {
@@ -12,23 +12,30 @@ import {
 import { formatPublicKey, listPublicKeyDisplayFormats } from "./mnemonic/public-key";
 import { readStoredKeyPair, saveStoredKeyPair, type StoredKeyPair } from "./storage";
 
-type Tab = "key" | "encode-image" | "read-image";
+type ActiveModal = "account" | "read-image" | null;
 
 const ACCEPTED_IMAGE_TYPES = "image/png,image/jpeg,image/bmp";
 const SUPPORTED_IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".bmp"];
 
 export function App(): JSX.Element {
-  const [activeTab, setActiveTab] = useState<Tab>("key");
+  const [activeModal, setActiveModal] = useState<ActiveModal>(null);
   const [storedKeyPair, setStoredKeyPair] = useState<StoredKeyPair | null>(() => readStoredKeyPair());
   const [keyMessage, setKeyMessage] = useState("");
   const [publicKeyFormat, setPublicKeyFormat] = useState("raw");
 
   return (
     <section className="app-panel" aria-labelledby="app-title">
+      <SiteHeader
+        hasStoredKey={storedKeyPair !== null}
+        onAccountClick={() => setActiveModal("account")}
+        onReadImageClick={() => setActiveModal("read-image")}
+      />
       <Hero />
-      <TabNav activeTab={activeTab} onSelect={setActiveTab} />
-      <div className="tab-panel">
-        {activeTab === "key" ? (
+      <div className="primary-panel">
+        <EncodeImageTab />
+      </div>
+      {activeModal === "account" ? (
+        <Modal title={storedKeyPair ? "Account" : "Sign Up"} onClose={() => setActiveModal(null)}>
           <KeyTab
             keyMessage={keyMessage}
             publicKeyFormat={publicKeyFormat}
@@ -37,11 +44,38 @@ export function App(): JSX.Element {
             onPublicKeyFormatChange={setPublicKeyFormat}
             onStoredKeyPairChange={setStoredKeyPair}
           />
-        ) : null}
-        {activeTab === "encode-image" ? <EncodeImageTab /> : null}
-        {activeTab === "read-image" ? <ReadImageTab storedKeyPair={storedKeyPair} /> : null}
-      </div>
+        </Modal>
+      ) : null}
+      {activeModal === "read-image" && storedKeyPair ? (
+        <Modal title="Read Image" onClose={() => setActiveModal(null)}>
+          <ReadImageTab storedKeyPair={storedKeyPair} />
+        </Modal>
+      ) : null}
     </section>
+  );
+}
+
+interface SiteHeaderProps {
+  hasStoredKey: boolean;
+  onAccountClick: () => void;
+  onReadImageClick: () => void;
+}
+
+function SiteHeader({ hasStoredKey, onAccountClick, onReadImageClick }: SiteHeaderProps): JSX.Element {
+  return (
+    <header className="site-header" aria-label="Site header">
+      <div className="site-brand">Остапа несло</div>
+      <div className="header-actions">
+        <button type="button" onClick={onAccountClick}>
+          {hasStoredKey ? "Account" : "Sign Up"}
+        </button>
+        {hasStoredKey ? (
+          <button type="button" onClick={onReadImageClick}>
+            Read Image
+          </button>
+        ) : null}
+      </div>
+    </header>
   );
 }
 
@@ -58,31 +92,38 @@ function Hero(): JSX.Element {
   );
 }
 
-interface TabNavProps {
-  activeTab: Tab;
-  onSelect: (tab: Tab) => void;
+interface ModalProps {
+  children: JSX.Element;
+  onClose: () => void;
+  title: string;
 }
 
-function TabNav({ activeTab, onSelect }: TabNavProps): JSX.Element {
+function Modal({ children, onClose, title }: ModalProps): JSX.Element {
+  const titleId = useId();
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent): void {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
   return (
-    <nav className="tabs" aria-label="Image message workflows">
-      <TabButton activeTab={activeTab} label="My key" tab="key" onSelect={onSelect} />
-      <TabButton activeTab={activeTab} label="Encode Image" tab="encode-image" onSelect={onSelect} />
-      <TabButton activeTab={activeTab} label="Read Image" tab="read-image" onSelect={onSelect} />
-    </nav>
-  );
-}
-
-interface TabButtonProps extends TabNavProps {
-  label: string;
-  tab: Tab;
-}
-
-function TabButton({ activeTab, label, tab, onSelect }: TabButtonProps): JSX.Element {
-  return (
-    <button className="tab-button" type="button" aria-selected={activeTab === tab} onClick={() => onSelect(tab)}>
-      {label}
-    </button>
+    <div className="modal-backdrop" data-testid="modal-backdrop">
+      <section className="modal-panel" role="dialog" aria-modal="true" aria-labelledby={titleId}>
+        <div className="modal-header">
+          <h2 id={titleId}>{title}</h2>
+          <button className="modal-close" type="button" aria-label={`Close ${title}`} onClick={onClose}>
+            Close
+          </button>
+        </div>
+        <div className="modal-body">{children}</div>
+      </section>
+    </div>
   );
 }
 
@@ -138,10 +179,10 @@ function KeyTab({
   if (!storedKeyPair) {
     return (
       <section className="workflow" aria-labelledby="key-title">
-        <h2 id="key-title">Create your local key</h2>
+        <h3 id="key-title">Create your local key</h3>
         <p className="helper">
-          Your private key is protected with this passphrase before it is saved in localStorage. There is no
-          recovery if you forget it.
+          Sign Up creates a local browser account for image messages. Your private key is protected with this
+          passphrase before it is saved in localStorage, and there is no recovery if you forget it.
         </p>
         <form className="form-grid" onSubmit={(event) => void handleSubmit(event)}>
           <label>
@@ -164,7 +205,7 @@ function KeyTab({
 
   return (
     <section className="workflow" aria-labelledby="key-title">
-      <h2 id="key-title">Your public key</h2>
+      <h3 id="key-title">Your public key</h3>
       <p className="helper">
         Share this public key with someone who wants to encode an image message for you. Key replacement,
         private-key export, and private-key import are intentionally unavailable in this MVP.
