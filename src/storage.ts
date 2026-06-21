@@ -1,7 +1,7 @@
 const PUBLIC_KEY_STORAGE_KEY = "stegosavr.publicKey";
 const PROTECTED_PRIVATE_KEY_STORAGE_KEY = "stegosavr.protectedPrivateKey";
-const PUBLIC_KEY_PREFIX = "STEGOSAVR-PUBLIC:v1:";
 const PROTECTED_PRIVATE_KEY_PREFIX = "STEGOSAVR-PRIVATE:v2:";
+const PUBLIC_KEY_HEX_LENGTH = 64;
 
 export interface StoredKeyPair {
   publicKey: string;
@@ -35,7 +35,9 @@ export function hasStoredKeyPair(storage: KeyStorage = localStorage): boolean {
 
 function isCompatibleStoredKeyPair(publicKey: string | null, protectedPrivateKey: string | null): boolean {
   return Boolean(
-    publicKey?.startsWith(PUBLIC_KEY_PREFIX) &&
+    publicKey !== null &&
+      /^[0-9a-fA-F]+$/.test(publicKey) &&
+      publicKey.length === PUBLIC_KEY_HEX_LENGTH &&
       protectedPrivateKey?.startsWith(PROTECTED_PRIVATE_KEY_PREFIX),
   );
 }

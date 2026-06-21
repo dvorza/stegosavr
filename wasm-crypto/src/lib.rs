@@ -9,7 +9,6 @@ use serde::Serialize;
 use sha2::Sha256;
 use wasm_bindgen::prelude::*;
 
-const PUBLIC_PREFIX: &str = "STEGOSAVR-PUBLIC:v1";
 const PRIVATE_PREFIX: &str = "STEGOSAVR-PRIVATE:v2";
 const KEY_BYTES: usize = 32;
 const SECRET_HEX_BYTES: usize = 64;
@@ -91,8 +90,8 @@ fn encode_image_inner(
     recipient_public_key: &str,
     plaintext: &str,
 ) -> mytischtschi::Result<Vec<u8>> {
-    let public_hex = public_key_to_engine_hex(recipient_public_key)
-        .map_err(|_| EngineError::InvalidKey { expected: 64 })?;
+    let public_hex = canonical_public_hex(recipient_public_key)
+        .map_err(|_| EngineError::InvalidKey { expected: SECRET_HEX_BYTES })?;
     mytischtschi::encrypt_and_embed(image_bytes, &public_hex, plaintext)
 }
 
@@ -122,7 +121,7 @@ fn generate_key_pair_inner(
     let protected_private_key =
         protect_secret_hex(&keys.secret_hex, passphrase, salt_random, nonce_random)?;
     let response = GeneratedKeyPair {
-        public_key: engine_hex_to_public_key(&keys.public_hex)?,
+        public_key: canonical_public_hex(&keys.public_hex)?,
         protected_private_key,
     };
 
@@ -172,15 +171,10 @@ fn unlock_secret_hex(protected_private_key: &str, passphrase: &str) -> Result<St
     Ok(secret_hex)
 }
 
-fn engine_hex_to_public_key(public_hex: &str) -> Result<String, String> {
-    let bytes = hex_to_bytes(public_hex, KEY_BYTES, "public key")?;
-    Ok(format!("{}:{}", PUBLIC_PREFIX, encode(&bytes)))
-}
-
-fn public_key_to_engine_hex(public_key: &str) -> Result<String, String> {
-    let parts = split_envelope(public_key, PUBLIC_PREFIX, 2)?;
-    let bytes = fixed_bytes::<KEY_BYTES>(&decode(parts[2])?, "public key")?;
-    Ok(bytes_to_hex(&bytes))
+fn canonical_public_hex(public_key: &str) -> Result<String, String> {
+    let public_key = public_key.trim();
+    require_hex(public_key, KEY_BYTES * 2, "public key")?;
+    Ok(public_key.to_ascii_lowercase())
 }
 
 fn split_envelope<'a>(
@@ -218,26 +212,6 @@ fn require_hex(value: &str, expected_len: usize, name: &str) -> Result<(), Strin
     }
 
     Ok(())
-}
-
-fn hex_to_bytes(hex: &str, expected_bytes: usize, name: &str) -> Result<Vec<u8>, String> {
-    require_hex(hex, expected_bytes * 2, name)?;
-    (0..hex.len())
-        .step_by(2)
-        .map(|index| {
-            u8::from_str_radix(&hex[index..index + 2], 16)
-                .map_err(|_| format!("invalid {name} hex"))
-        })
-        .collect()
-}
-
-fn bytes_to_hex(bytes: &[u8]) -> String {
-    let mut output = String::with_capacity(bytes.len() * 2);
-    for byte in bytes {
-        output.push(char::from_digit((byte >> 4) as u32, 16).expect("hex digit"));
-        output.push(char::from_digit((byte & 0x0f) as u32, 16).expect("hex digit"));
-    }
-    output
 }
 
 fn fixed_bytes<const N: usize>(bytes: &[u8], name: &str) -> Result<[u8; N], String> {
@@ -297,11 +271,14 @@ mod tests {
     const PRIVATE_NONCE: [u8; 12] = [5; 12];
 
     #[test]
-    fn converts_public_key_between_engine_hex_and_stegosavr_format() {
-        let public_hex = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f";
-        let public_key = engine_hex_to_public_key(public_hex).unwrap();
+    fn canonicalizes_native_public_hex() {
+        let public_hex = "000102030405060708090A0B0C0D0E0F101112131415161718191A1B1C1D1E1F";
 
-        assert_eq!(public_key_to_engine_hex(&public_key).unwrap(), public_hex);
+        assert_eq!(
+            canonical_public_hex(public_hex).unwrap(),
+            "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
+        );
+        assert!(canonical_public_hex(&["STEGOSAVR", "PUBLIC:v1:abc"].join("-")).is_err());
     }
 
     #[test]
@@ -319,14 +296,13 @@ mod tests {
     }
 
     #[test]
-    fn generates_key_pair_with_stegosavr_envelopes() {
+    fn generates_key_pair_with_native_public_hex_and_protected_private_key() {
         let json = generate_key_pair_inner("passphrase", &SALT_RANDOM, &PRIVATE_NONCE).unwrap();
         let generated: serde_json::Value = serde_json::from_str(&json).unwrap();
+        let public_key = generated["publicKey"].as_str().unwrap();
 
-        assert!(generated["publicKey"]
-            .as_str()
-            .unwrap()
-            .starts_with("STEGOSAVR-PUBLIC:v1:"));
+        assert_eq!(public_key.len(), 64);
+        assert!(public_key.chars().all(|character| character.is_ascii_hexdigit()));
         assert!(generated["protectedPrivateKey"]
             .as_str()
             .unwrap()

@@ -5,7 +5,7 @@ import { decodeTokenGridPublicKey, encodeTokenGridPublicKey } from "./token-grid
 import { tokenGridPublicKeyCodec } from "./token-grid-codec";
 
 export type { PublicKeyDisplayFormat } from "./codecs";
-export { buildRawPublicKey, parseRawPublicKeyBytes, RAW_PUBLIC_KEY_PREFIX } from "./raw-key";
+export { buildRawPublicKey, parseRawPublicKeyBytes } from "./raw-key";
 export { decodeTokenGridPublicKey as decodeMnemonicPublicKey, encodeTokenGridPublicKey as encodeMnemonicPublicKey };
 
 const publicKeyCodecs: PublicKeyCodec[] = [rawPublicKeyCodec, tokenGridPublicKeyCodec, grammarPublicKeyCodec];

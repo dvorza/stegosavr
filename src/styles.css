@@ -125,7 +125,8 @@ h3 {
 
 .lede,
 .helper,
-.empty-state {
+.empty-state,
+.message-budget {
   color: #405747;
   max-width: 42rem;
 }
@@ -162,6 +163,20 @@ label {
   color: #263b2d;
   display: block;
   font-weight: 700;
+}
+
+.message-budget {
+  font-size: 0.95rem;
+  margin: -0.5rem 0 0;
+}
+
+.message-budget-low {
+  color: #7d5a00;
+  font-weight: 700;
+}
+
+.message-budget-error {
+  color: #7c261b;
 }
 
 .actions,

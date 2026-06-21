@@ -17,7 +17,7 @@ transport is the product surface.
 
 ## Public Key Formats
 
-The raw `STEGOSAVR-PUBLIC:v1` public key remains the default display option. The
+The raw native `mytischtschi` public hex key is the default display option. The
 key page also offers reversible mnemonic display formats that encode the same
 32-byte public key material used by the image transport engine.
 
@@ -56,8 +56,10 @@ corrupted phrases are rejected before image encoding.
 ## Image Transport
 
 The `Encode Image` tab accepts a carrier image, recipient public key, and
-plaintext message. The app validates the message and carrier locally, then uses
-the vendored `mytischtschi` engine to encrypt and embed the message. Successful
+plaintext message. The app shows the detected alphabet, current character count,
+maximum character count, and remaining character budget while the message is
+being written. It validates the message and carrier locally, then uses the
+vendored `mytischtschi` engine to encrypt and embed the message. Successful
 encoding produces a JPEG download.
 
 The `Read Image` tab accepts an encoded image and the passphrase for the stored
@@ -86,8 +88,7 @@ as close to the upstream source as possible. Stegosavr-specific behavior lives
 outside that vendor directory:
 
 - passphrase-protected browser storage;
-- `STEGOSAVR-PUBLIC:v1` public-key display and mnemonic formats;
-- conversion between Stegosavr public-key strings and mytischtschi hex keys;
+- native `mytischtschi` public hex display and mnemonic formats;
 - UI labels, validation, and user-facing error messages.
 
 The Stegosavr WASM crate depends on the vendored engine through a Cargo path

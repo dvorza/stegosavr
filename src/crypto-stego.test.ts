@@ -14,7 +14,7 @@ vi.mock("./wasm/stegosavr_crypto", () => ({
   stegosavrMessageLimits: vi.fn(() => JSON.stringify({ english: 160, russian: 120 })),
 }));
 
-const rawPublicKey = "STEGOSAVR-PUBLIC:v1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+const rawPublicKey = "0000000000000000000000000000000000000000000000000000000000000000";
 
 describe("image transport crypto wrappers", () => {
   beforeEach(() => {

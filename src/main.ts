@@ -6,6 +6,7 @@ import {
   encodeImageForRecipient,
   inspectImageCarrier,
   readMessageFromImage,
+  type MessageReport,
 } from "./crypto";
 import { formatPublicKey, listPublicKeyDisplayFormats } from "./mnemonic/public-key";
 import { readStoredKeyPair, saveStoredKeyPair, type StoredKeyPair } from "./storage";
@@ -20,6 +21,9 @@ interface AppState {
   publicKeyFormat: string;
   encodeImageError: string;
   encodeImageMessage: string;
+  encodePlaintext: string;
+  encodeMessageReport: MessageReport | null;
+  encodeMessageBudgetError: string;
   encodedImageUrl: string;
   encodedImageName: string;
   readImageError: string;
@@ -44,6 +48,9 @@ const state: AppState = {
   publicKeyFormat: "raw",
   encodeImageError: "",
   encodeImageMessage: "",
+  encodePlaintext: "",
+  encodeMessageReport: null,
+  encodeMessageBudgetError: "",
   encodedImageUrl: "",
   encodedImageName: "stegosavr-image.jpg",
   readImageError: "",
@@ -168,8 +175,9 @@ function renderEncodeImageTab(): string {
         </label>
         <label>
           Message
-          <textarea name="plaintext" rows="6"></textarea>
+          <textarea name="plaintext" rows="6" data-plaintext>${escapeHtml(state.encodePlaintext)}</textarea>
         </label>
+        ${renderMessageBudget()}
         <button type="submit">Encode Image</button>
       </form>
       ${renderError(state.encodeImageError)}
@@ -259,6 +267,31 @@ function renderError(message: string): string {
   return message ? `<p class="error" role="alert">${escapeHtml(message)}</p>` : "";
 }
 
+function renderMessageBudget(): string {
+  if (state.encodeMessageBudgetError) {
+    return `<p class="message-budget message-budget-error" role="alert">${escapeHtml(state.encodeMessageBudgetError)}</p>`;
+  }
+
+  if (!state.encodePlaintext || !state.encodeMessageReport) {
+    return `<p class="message-budget">Enter a message to see the available payload budget.</p>`;
+  }
+
+  const remaining = Math.max(0, state.encodeMessageReport.maxChars - state.encodeMessageReport.charCount);
+  const budgetClass = remaining <= 10 ? " message-budget-low" : "";
+
+  return `
+    <p class="message-budget${budgetClass}" role="status">
+      Alphabet: ${formatAlphabet(state.encodeMessageReport.alphabet)} ·
+      ${state.encodeMessageReport.charCount}/${state.encodeMessageReport.maxChars} characters ·
+      ${remaining} remaining
+    </p>
+  `;
+}
+
+function formatAlphabet(alphabet: MessageReport["alphabet"]): string {
+  return alphabet === "russian" ? "Russian" : "English";
+}
+
 function bindTabButtons(): void {
   app.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -272,6 +305,7 @@ function bindActiveTab(): void {
   app.querySelector<HTMLFormElement>('[data-form="key"]')?.addEventListener("submit", handleKeySubmit);
   app.querySelector<HTMLFormElement>('[data-form="encode-image"]')?.addEventListener("submit", handleEncodeImageSubmit);
   app.querySelector<HTMLFormElement>('[data-form="read-image"]')?.addEventListener("submit", handleReadImageSubmit);
+  app.querySelector<HTMLTextAreaElement>("[data-plaintext]")?.addEventListener("input", handlePlaintextInput);
   app.querySelector<HTMLSelectElement>("[data-public-key-format]")?.addEventListener("change", handlePublicKeyFormatChange);
   app.querySelector<HTMLButtonElement>('[data-copy="public-key"]')?.addEventListener("click", () => {
     void handleKeyCopy(getSelectedPublicKeyRepresentation(), "Public key copied.");
@@ -279,6 +313,58 @@ function bindActiveTab(): void {
   app.querySelector<HTMLButtonElement>('[data-copy="read-image-plaintext"]')?.addEventListener("click", () => {
     void handleReadImagePlaintextCopy();
   });
+}
+
+let encodeMessageAnalysisId = 0;
+
+function handlePlaintextInput(event: Event): void {
+  const textarea = event.currentTarget as HTMLTextAreaElement;
+  state.encodePlaintext = textarea.value;
+  state.encodeMessageReport = null;
+  state.encodeMessageBudgetError = "";
+  state.encodeImageError = "";
+  state.encodeImageMessage = "";
+  resetEncodedImageUrl();
+
+  void updateEncodeMessageAnalysis(textarea.value);
+}
+
+async function updateEncodeMessageAnalysis(plaintext: string): Promise<void> {
+  const analysisId = ++encodeMessageAnalysisId;
+
+  if (!plaintext) {
+    state.encodeMessageReport = null;
+    state.encodeMessageBudgetError = "";
+    render();
+    return;
+  }
+
+  try {
+    const report = await analyzePlaintextMessage(plaintext);
+    if (analysisId !== encodeMessageAnalysisId) {
+      return;
+    }
+
+    if (!report.fits) {
+      const trimmedPlaintext = trimToCodePoints(plaintext, report.maxChars);
+      state.encodePlaintext = trimmedPlaintext;
+      state.encodeMessageReport = await analyzePlaintextMessage(trimmedPlaintext);
+    } else {
+      state.encodeMessageReport = report;
+    }
+
+    state.encodeMessageBudgetError = "";
+  } catch {
+    if (analysisId !== encodeMessageAnalysisId) {
+      return;
+    }
+
+    state.encodeMessageReport = null;
+    state.encodeMessageBudgetError =
+      "The message contains unsupported characters. Use one supported alphabet and supported punctuation.";
+  }
+
+  render();
 }
 
 function renderPublicKeyFormatOptions(): string {
@@ -338,10 +424,11 @@ async function handleEncodeImageSubmit(event: SubmitEvent): Promise<void> {
   const form = event.currentTarget as HTMLFormElement;
   const file = readFormFile(form, "carrierImage");
   const recipientPublicKey = readFormValue(form, "recipientPublicKey");
-  const plaintext = readFormValue(form, "plaintext");
+  const plaintext = readTextFormValue(form, "plaintext");
 
   state.encodeImageError = "";
   state.encodeImageMessage = "";
+  state.encodePlaintext = plaintext;
   resetEncodedImageUrl();
 
   const validationError = validateEncodeImageForm(file, recipientPublicKey, plaintext);
@@ -359,6 +446,8 @@ async function handleEncodeImageSubmit(event: SubmitEvent): Promise<void> {
 
     const imageBytes = await carrierFile.arrayBuffer();
     const messageReport = await analyzePlaintextMessage(plaintext);
+    state.encodeMessageReport = messageReport;
+    state.encodeMessageBudgetError = "";
     if (!messageReport.fits) {
       state.encodeImageError = `The ${messageReport.alphabet} message is too long (${messageReport.charCount}/${messageReport.maxChars} characters).`;
       state.encodeImageMessage = "";
@@ -409,7 +498,7 @@ function validateEncodeImageForm(file: File | null, recipientPublicKey: string, 
     return "Recipient public key is required.";
   }
 
-  if (!plaintext) {
+  if (!plaintext.trim()) {
     return "A message is required.";
   }
 
@@ -498,6 +587,13 @@ function readFormValue(form: HTMLFormElement, name: string): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function readTextFormValue(form: HTMLFormElement, name: string): string {
+  const data = new FormData(form);
+  const value = data.get(name);
+
+  return typeof value === "string" ? value : "";
+}
+
 function readFormFile(form: HTMLFormElement, name: string): File | null {
   const data = new FormData(form);
   const value = data.get(name);
@@ -516,6 +612,10 @@ function isSupportedImageFile(file: File): boolean {
 
 function stripExtension(fileName: string): string {
   return fileName.replace(/\.[^.]*$/, "");
+}
+
+function trimToCodePoints(value: string, maxLength: number): string {
+  return Array.from(value).slice(0, maxLength).join("");
 }
 
 function resetEncodedImageUrl(): void {
