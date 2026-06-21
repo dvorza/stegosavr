@@ -418,30 +418,6 @@ function EncodeImageTab(): JSX.Element {
         <div className="encode-form-column">
           <form className="form-grid" onSubmit={(event) => void handleSubmit(event)}>
             <label>
-              Carrier image
-              <input
-                name="carrierImage"
-                type="file"
-                accept={ACCEPTED_IMAGE_TYPES}
-                onChange={(event) => {
-                  const file = event.currentTarget.files?.[0] ?? null;
-                  setCarrierFile(file);
-                  setSelectedGalleryPath(null);
-                  setError("");
-                  setMessage("");
-                  resetEncodedImageUrl();
-                  if (file) {
-                    setCarrierPreviewUrl((currentUrl) => {
-                      URL.revokeObjectURL(currentUrl);
-                      return URL.createObjectURL(file);
-                    });
-                  } else {
-                    resetCarrierPreview();
-                  }
-                }}
-              />
-            </label>
-            <label>
               Recipient public key
               <textarea
                 name="recipientPublicKey"
@@ -464,33 +440,57 @@ function EncodeImageTab(): JSX.Element {
           </form>
           <ErrorMessage message={error} />
           <Notice message={message} />
-          <EncodedImageOutput imageName={encodedImageName} imageUrl={encodedImageUrl} />
         </div>
-        <CarrierPreview previewUrl={carrierPreviewUrl} />
+        <div className="carrier-panel">
+          <label>
+            Carrier image
+            <input
+              name="carrierImage"
+              type="file"
+              accept={ACCEPTED_IMAGE_TYPES}
+              onChange={(event) => {
+                const file = event.currentTarget.files?.[0] ?? null;
+                setCarrierFile(file);
+                setSelectedGalleryPath(null);
+                setError("");
+                setMessage("");
+                resetEncodedImageUrl();
+                if (file) {
+                  setCarrierPreviewUrl((currentUrl) => {
+                    URL.revokeObjectURL(currentUrl);
+                    return URL.createObjectURL(file);
+                  });
+                } else {
+                  resetCarrierPreview();
+                }
+              }}
+            />
+          </label>
+          <div className="carrier-panel-display">
+            {(encodedImageUrl || carrierPreviewUrl) ? (
+              <img
+                className="carrier-panel-image"
+                src={encodedImageUrl || carrierPreviewUrl}
+                alt={encodedImageUrl ? "Encoded image with hidden message" : "Selected carrier image preview"}
+              />
+            ) : (
+              <div className="carrier-preview-placeholder">
+                Select a carrier image from the gallery or upload your own
+              </div>
+            )}
+          </div>
+          {encodedImageUrl ? (
+            <a className="download-link" href={encodedImageUrl} download={encodedImageName}>
+              Download JPEG
+            </a>
+          ) : null}
+        </div>
       </div>
       <CarrierGallery
         selectedPath={selectedGalleryPath}
         onSelect={(path, filename) => void handleGallerySelect(path, filename)}
       />
     </section>
-  );
-}
-
-interface CarrierPreviewProps {
-  previewUrl: string;
-}
-
-function CarrierPreview({ previewUrl }: CarrierPreviewProps): JSX.Element {
-  return (
-    <div className="carrier-preview-panel">
-      {previewUrl ? (
-        <img className="carrier-preview-image" src={previewUrl} alt="Selected carrier image preview" />
-      ) : (
-        <div className="carrier-preview-placeholder">
-          Select a carrier image from the gallery or upload your own
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -548,29 +548,6 @@ function MessageBudget({ error, plaintext, report }: MessageBudgetProps): JSX.El
       Alphabet: {formatAlphabet(report.alphabet)} · {report.charCount}/{report.maxChars} characters · {remaining}{" "}
       remaining
     </p>
-  );
-}
-
-interface EncodedImageOutputProps {
-  imageName: string;
-  imageUrl: string;
-}
-
-function EncodedImageOutput({ imageName, imageUrl }: EncodedImageOutputProps): JSX.Element | null {
-  if (!imageUrl) {
-    return null;
-  }
-
-  return (
-    <div className="output">
-      <div className="output-header">
-        <h3>Encoded JPEG</h3>
-        <a className="download-link" href={imageUrl} download={imageName}>
-          Download JPEG
-        </a>
-      </div>
-      <img className="generated-meme-preview" src={imageUrl} alt="Encoded image with hidden message" />
-    </div>
   );
 }
 

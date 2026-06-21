@@ -285,18 +285,24 @@ label {
   min-width: 0;
 }
 
-.carrier-preview-panel {
+.carrier-panel {
   display: flex;
   flex-direction: column;
+  gap: 0.75rem;
   min-height: 200px;
 }
 
-.carrier-preview-image {
+.carrier-panel-display {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+
+.carrier-panel-image {
   border: 1px solid #c9d7c3;
   border-radius: 8px;
   display: block;
   flex: 1;
-  height: 100%;
   min-height: 200px;
   object-fit: contain;
   width: 100%;
@@ -369,7 +375,7 @@ label {
     grid-template-columns: 1fr minmax(200px, 40%);
   }
 
-  .carrier-preview-panel {
+  .carrier-panel {
     align-self: stretch;
   }
 }
