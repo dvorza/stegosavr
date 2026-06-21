@@ -9,6 +9,7 @@ import {
   readMessageFromImage,
   type MessageReport,
 } from "./crypto";
+import { GALLERY_IMAGES } from "./gallery-images";
 import { formatPublicKey, listPublicKeyDisplayFormats } from "./mnemonic/public-key";
 import { readStoredKeyPair, saveStoredKeyPair, type StoredKeyPair } from "./storage";
 
@@ -240,6 +241,8 @@ function KeyTab({
 
 function EncodeImageTab(): JSX.Element {
   const [carrierFile, setCarrierFile] = useState<File | null>(null);
+  const [carrierPreviewUrl, setCarrierPreviewUrl] = useState("");
+  const [selectedGalleryPath, setSelectedGalleryPath] = useState<string | null>(null);
   const [recipientPublicKey, setRecipientPublicKey] = useState("");
   const [plaintext, setPlaintext] = useState("");
   const [messageReport, setMessageReport] = useState<MessageReport | null>(null);
@@ -259,6 +262,13 @@ function EncodeImageTab(): JSX.Element {
     });
   }
 
+  function resetCarrierPreview(): void {
+    setCarrierPreviewUrl((currentUrl) => {
+      URL.revokeObjectURL(currentUrl);
+      return "";
+    });
+  }
+
   useEffect(
     () => () => {
       if (encodedImageUrl) {
@@ -266,6 +276,13 @@ function EncodeImageTab(): JSX.Element {
       }
     },
     [encodedImageUrl],
+  );
+
+  useEffect(
+    () => () => {
+      URL.revokeObjectURL(carrierPreviewUrl);
+    },
+    [carrierPreviewUrl],
   );
 
   useEffect(() => {
@@ -315,6 +332,27 @@ function EncodeImageTab(): JSX.Element {
     setError("");
     setMessage("");
     resetEncodedImageUrl();
+  }
+
+  async function handleGallerySelect(path: string, filename: string): Promise<void> {
+    setSelectedGalleryPath(path);
+    setError("");
+    setMessage("");
+    resetEncodedImageUrl();
+
+    try {
+      const response = await fetch(path);
+      const blob = await response.blob();
+      const file = new File([blob], filename, { type: blob.type });
+      setCarrierFile(file);
+      setCarrierPreviewUrl((currentUrl) => {
+        URL.revokeObjectURL(currentUrl);
+        return path;
+      });
+    } catch {
+      setError("Failed to load gallery image.");
+      setSelectedGalleryPath(null);
+    }
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
@@ -376,46 +414,110 @@ function EncodeImageTab(): JSX.Element {
         Choose a detailed carrier image, paste the recipient's public key, and write a short supported message.
         Stegosavr uses mytischtschi locally and produces a shareable JPEG.
       </p>
-      <form className="form-grid" onSubmit={(event) => void handleSubmit(event)}>
-        <label>
-          Carrier image
-          <input
-            name="carrierImage"
-            type="file"
-            accept={ACCEPTED_IMAGE_TYPES}
-            onChange={(event) => {
-              setCarrierFile(event.currentTarget.files?.[0] ?? null);
-              setError("");
-              setMessage("");
-              resetEncodedImageUrl();
-            }}
-          />
-        </label>
-        <label>
-          Recipient public key
-          <textarea
-            name="recipientPublicKey"
-            rows={5}
-            value={recipientPublicKey}
-            onChange={(event) => setRecipientPublicKey(event.currentTarget.value)}
-          />
-        </label>
-        <label>
-          Message
-          <textarea
-            name="plaintext"
-            rows={6}
-            value={plaintext}
-            onChange={(event) => handlePlaintextChange(event.currentTarget.value)}
-          />
-        </label>
-        <MessageBudget error={messageBudgetError} plaintext={plaintext} report={messageReport} />
-        <button type="submit">Encode Image</button>
-      </form>
-      <ErrorMessage message={error} />
-      <Notice message={message} />
-      <EncodedImageOutput imageName={encodedImageName} imageUrl={encodedImageUrl} />
+      <div className="encode-layout">
+        <div className="encode-form-column">
+          <form className="form-grid" onSubmit={(event) => void handleSubmit(event)}>
+            <label>
+              Carrier image
+              <input
+                name="carrierImage"
+                type="file"
+                accept={ACCEPTED_IMAGE_TYPES}
+                onChange={(event) => {
+                  const file = event.currentTarget.files?.[0] ?? null;
+                  setCarrierFile(file);
+                  setSelectedGalleryPath(null);
+                  setError("");
+                  setMessage("");
+                  resetEncodedImageUrl();
+                  if (file) {
+                    setCarrierPreviewUrl((currentUrl) => {
+                      URL.revokeObjectURL(currentUrl);
+                      return URL.createObjectURL(file);
+                    });
+                  } else {
+                    resetCarrierPreview();
+                  }
+                }}
+              />
+            </label>
+            <label>
+              Recipient public key
+              <textarea
+                name="recipientPublicKey"
+                rows={5}
+                value={recipientPublicKey}
+                onChange={(event) => setRecipientPublicKey(event.currentTarget.value)}
+              />
+            </label>
+            <label>
+              Message
+              <textarea
+                name="plaintext"
+                rows={6}
+                value={plaintext}
+                onChange={(event) => handlePlaintextChange(event.currentTarget.value)}
+              />
+            </label>
+            <MessageBudget error={messageBudgetError} plaintext={plaintext} report={messageReport} />
+            <button type="submit">Encode Image</button>
+          </form>
+          <ErrorMessage message={error} />
+          <Notice message={message} />
+          <EncodedImageOutput imageName={encodedImageName} imageUrl={encodedImageUrl} />
+        </div>
+        <CarrierPreview previewUrl={carrierPreviewUrl} />
+      </div>
+      <CarrierGallery
+        selectedPath={selectedGalleryPath}
+        onSelect={(path, filename) => void handleGallerySelect(path, filename)}
+      />
     </section>
+  );
+}
+
+interface CarrierPreviewProps {
+  previewUrl: string;
+}
+
+function CarrierPreview({ previewUrl }: CarrierPreviewProps): JSX.Element {
+  return (
+    <div className="carrier-preview-panel">
+      {previewUrl ? (
+        <img className="carrier-preview-image" src={previewUrl} alt="Selected carrier image preview" />
+      ) : (
+        <div className="carrier-preview-placeholder">
+          Select a carrier image from the gallery or upload your own
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface CarrierGalleryProps {
+  selectedPath: string | null;
+  onSelect: (path: string, filename: string) => void;
+}
+
+function CarrierGallery({ selectedPath, onSelect }: CarrierGalleryProps): JSX.Element {
+  return (
+    <div className="carrier-gallery">
+      <p className="carrier-gallery-label">Sample carrier images</p>
+      <div className="carrier-gallery-grid">
+        {GALLERY_IMAGES.map((image) => (
+          <button
+            key={image.path}
+            type="button"
+            className={`carrier-thumbnail-btn${image.path === selectedPath ? " carrier-thumbnail-btn--selected" : ""}`}
+            aria-label={image.filename}
+            aria-pressed={image.path === selectedPath}
+            onClick={() => onSelect(image.path, image.filename)}
+          >
+            <img className="carrier-thumbnail-img" src={image.path} alt="" loading="lazy" />
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
