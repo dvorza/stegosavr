@@ -481,7 +481,7 @@ function EncodeImageTab({ storedKeyPair }: EncodeImageTabProps): JSX.Element {
                 name="topText"
                 type="text"
                 value={topText}
-                placeholder="Подпись сверху (необязательно)"
+                placeholder="Подпись сверху"
                 onChange={(event) => {
                   setTopText(event.currentTarget.value);
                   resetEncodedImageUrl();
@@ -494,7 +494,7 @@ function EncodeImageTab({ storedKeyPair }: EncodeImageTabProps): JSX.Element {
                 name="bottomText"
                 type="text"
                 value={bottomText}
-                placeholder="Подпись снизу (необязательно)"
+                placeholder="Подпись снизу"
                 onChange={(event) => {
                   setBottomText(event.currentTarget.value);
                   resetEncodedImageUrl();
