@@ -27,13 +27,12 @@ export function App(): JSX.Element {
   const [publicKeyFormat, setPublicKeyFormat] = useState("raw");
 
   return (
-    <section className="app-panel" aria-labelledby="app-title">
+    <section className="app-panel">
       <SiteHeader
         hasStoredKey={storedKeyPair !== null}
         onAccountClick={() => setActiveModal("account")}
         onReadImageClick={() => setActiveModal("read-image")}
       />
-      <Hero />
       <div className="primary-panel">
         <EncodeImageTab storedKeyPair={storedKeyPair} />
       </div>
@@ -67,7 +66,7 @@ interface SiteHeaderProps {
 function SiteHeader({ hasStoredKey, onAccountClick, onReadImageClick }: SiteHeaderProps): JSX.Element {
   return (
     <header className="site-header" aria-label="Site header">
-      <div className="site-brand">Остапа несло</div>
+      <div className="site-brand">Генератор Мемов</div>
       <div className="header-actions">
         <button type="button" onClick={onAccountClick}>
           {hasStoredKey ? "Account" : "Sign Up"}
@@ -82,18 +81,6 @@ function SiteHeader({ hasStoredKey, onAccountClick, onReadImageClick }: SiteHead
   );
 }
 
-function Hero(): JSX.Element {
-  return (
-    <header className="hero">
-      <p className="eyebrow">Потный вал вдохновенья</p>
-      <h1 id="app-title">Остапа несло</h1>
-      <p className="lede">
-        НЕЗАМЕНИМОЕ ПОСОБИЕ ДЛЯ СОЧИНЕНИЯ ЮБИЛЕЙНЫХ СТАТЕЙ, ТАБЕЛЬНЫХ ФЕЛЬЕТОНОВ, А ТАКЖЕ
-        ПАРАДНЫХ СТИХОТВОРЕНИЙ. ОД И ТРОПАРЕЙ
-      </p>
-    </header>
-  );
-}
 
 interface ModalProps {
   children: JSX.Element;

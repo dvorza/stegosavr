@@ -1,6 +1,6 @@
 {
-  "name": "Остапа несло",
-  "short_name": "Остап",
+  "name": "Генератор Мемов",
+  "short_name": "Мемы",
   "description": "Browser-only local encryption and meme transport app.",
   "start_url": ".",
   "scope": ".",
