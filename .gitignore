@@ -3,3 +3,9 @@ dist
 coverage
 wasm-crypto/target
 .DS_Store
+
+#IDE, AI, VM
+.claude/
+.dockerignore
+.idea/
+docker/
