@@ -1,7 +1,7 @@
 # Stegosavr
 
-Stegosavr is a browser-only encrypted image transport app built with Vite,
-TypeScript, plain CSS, Vitest, Rust, and WebAssembly.
+Stegosavr is a browser-only encrypted image transport app built with React,
+Vite, TypeScript, plain CSS, Vitest, Rust, and WebAssembly.
 
 The app lets a user:
 
@@ -126,7 +126,7 @@ online load, and install prompts vary by browser and platform.
 ## Scripts
 
 - `npm run dev` starts the local development server.
-- `npm test` runs Rust/WASM tests and TypeScript unit tests.
+- `npm test` runs Rust/WASM tests and TypeScript/UI unit tests.
 - `npm run build` builds the WASM module, type-checks, and builds the app into `dist`.
 - `npm run preview` previews the production build locally.
 

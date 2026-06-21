@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "stegosavr-pwa";
-const CACHE_NAME = `${CACHE_PREFIX}-v1`;
+const CACHE_NAME = `${CACHE_PREFIX}-v2`;
 
 const appScope = new URL(self.registration.scope);
 const stableShellUrls = ["./", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/icon-512.png"].map(

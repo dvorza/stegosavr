@@ -1,7 +1,7 @@
 {
   "name": "stegosavr",
   "version": "0.0.1",
-  "description": "A small vanilla TypeScript single page app.",
+  "description": "A browser-only React image transport app.",
   "repository": {
     "type": "git",
     "url": "git@github.com-dvorza:dvorza/stegosavr.git"
@@ -23,5 +23,16 @@
     "vite": "^8.0.16",
     "vitest": "^4.1.9",
     "wasm-pack": "^0.15.0"
+  },
+  "dependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.2",
+    "jsdom": "^29.1.1",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
   }
 }
