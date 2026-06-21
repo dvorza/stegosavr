@@ -177,12 +177,14 @@ function renderEncodeImageTab(): string {
           Message
           <textarea name="plaintext" rows="6" data-plaintext>${escapeHtml(state.encodePlaintext)}</textarea>
         </label>
-        ${renderMessageBudget()}
+        <div data-message-budget>
+          ${renderMessageBudget()}
+        </div>
         <button type="submit">Encode Image</button>
       </form>
-      ${renderError(state.encodeImageError)}
-      ${renderNotice(state.encodeImageMessage)}
-      ${renderEncodedImageDownload()}
+      <div data-encode-output>
+        ${renderEncodeOutput()}
+      </div>
     </section>
   `;
 }
@@ -259,6 +261,14 @@ function renderEncodedImageDownload(): string {
   `;
 }
 
+function renderEncodeOutput(): string {
+  return `
+    ${renderError(state.encodeImageError)}
+    ${renderNotice(state.encodeImageMessage)}
+    ${renderEncodedImageDownload()}
+  `;
+}
+
 function renderNotice(message: string): string {
   return message ? `<p class="notice" role="status">${escapeHtml(message)}</p>` : "";
 }
@@ -325,6 +335,8 @@ function handlePlaintextInput(event: Event): void {
   state.encodeImageError = "";
   state.encodeImageMessage = "";
   resetEncodedImageUrl();
+  updateMessageBudgetElement();
+  updateEncodeOutputElement();
 
   void updateEncodeMessageAnalysis(textarea.value);
 }
@@ -335,7 +347,7 @@ async function updateEncodeMessageAnalysis(plaintext: string): Promise<void> {
   if (!plaintext) {
     state.encodeMessageReport = null;
     state.encodeMessageBudgetError = "";
-    render();
+    updateMessageBudgetElement();
     return;
   }
 
@@ -348,7 +360,12 @@ async function updateEncodeMessageAnalysis(plaintext: string): Promise<void> {
     if (!report.fits) {
       const trimmedPlaintext = trimToCodePoints(plaintext, report.maxChars);
       state.encodePlaintext = trimmedPlaintext;
-      state.encodeMessageReport = await analyzePlaintextMessage(trimmedPlaintext);
+      updatePlaintextElement(trimmedPlaintext);
+      const trimmedReport = await analyzePlaintextMessage(trimmedPlaintext);
+      if (analysisId !== encodeMessageAnalysisId) {
+        return;
+      }
+      state.encodeMessageReport = trimmedReport;
     } else {
       state.encodeMessageReport = report;
     }
@@ -364,7 +381,31 @@ async function updateEncodeMessageAnalysis(plaintext: string): Promise<void> {
       "The message contains unsupported characters. Use one supported alphabet and supported punctuation.";
   }
 
-  render();
+  updateMessageBudgetElement();
+}
+
+function updateMessageBudgetElement(): void {
+  const budgetElement = app.querySelector<HTMLElement>("[data-message-budget]");
+
+  if (budgetElement) {
+    budgetElement.innerHTML = renderMessageBudget();
+  }
+}
+
+function updatePlaintextElement(value: string): void {
+  const textarea = app.querySelector<HTMLTextAreaElement>("[data-plaintext]");
+
+  if (textarea && textarea.value !== value) {
+    textarea.value = value;
+  }
+}
+
+function updateEncodeOutputElement(): void {
+  const outputElement = app.querySelector<HTMLElement>("[data-encode-output]");
+
+  if (outputElement) {
+    outputElement.innerHTML = renderEncodeOutput();
+  }
 }
 
 function renderPublicKeyFormatOptions(): string {
