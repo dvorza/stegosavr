@@ -43,7 +43,7 @@ describe("App", () => {
   it("renders Encode Image as the primary workflow without equal workflow tabs", () => {
     render(<App />);
 
-    expect(screen.getByRole("heading", { name: "Encode Image" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Создать мем" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Sign Up" })).toBeInTheDocument();
     expect(screen.queryByRole("navigation", { name: "Image message workflows" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "My key" })).not.toBeInTheDocument();
@@ -51,6 +51,8 @@ describe("App", () => {
   });
 
   it("updates message budget without replacing the focused message field", async () => {
+    localStorage.setItem("stegosavr.publicKey", publicKey);
+    localStorage.setItem("stegosavr.protectedPrivateKey", protectedPrivateKey);
     const user = userEvent.setup();
     render(<App />);
 
@@ -64,6 +66,8 @@ describe("App", () => {
   });
 
   it("caps supported message input at the analyzed payload limit", async () => {
+    localStorage.setItem("stegosavr.publicKey", publicKey);
+    localStorage.setItem("stegosavr.protectedPrivateKey", protectedPrivateKey);
     vi.mocked(analyzePlaintextMessage).mockImplementation(async (plaintext: string) => ({
       alphabet: "english",
       charCount: Array.from(plaintext).length,
@@ -116,6 +120,8 @@ describe("App", () => {
   });
 
   it("requires explicit modal close and keeps Encode Image state while modals open", async () => {
+    localStorage.setItem("stegosavr.publicKey", publicKey);
+    localStorage.setItem("stegosavr.protectedPrivateKey", protectedPrivateKey);
     const user = userEvent.setup();
     render(<App />);
 
@@ -123,15 +129,15 @@ describe("App", () => {
     await user.type(messageInput, "hello");
     await screen.findByText(/5\/160 characters/);
 
-    await user.click(screen.getByRole("button", { name: "Sign Up" }));
-    expect(screen.getByRole("dialog", { name: "Sign Up" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Account" }));
+    expect(screen.getByRole("dialog", { name: "Account" })).toBeInTheDocument();
 
     await user.click(screen.getByTestId("modal-backdrop"));
-    expect(screen.getByRole("dialog", { name: "Sign Up" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Account" })).toBeInTheDocument();
     expect(messageInput).toHaveValue("hello");
 
-    await user.click(screen.getByRole("button", { name: "Close Sign Up" }));
-    expect(screen.queryByRole("dialog", { name: "Sign Up" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Close Account" }));
+    expect(screen.queryByRole("dialog", { name: "Account" })).not.toBeInTheDocument();
     expect(messageInput).toHaveValue("hello");
   });
 
