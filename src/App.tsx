@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { FormEvent, JSX } from "react";
+import { renderCaptions } from "./canvas-caption";
 import QRCode from "qrcode";
 import { copyText } from "./clipboard";
 import {
@@ -34,7 +35,7 @@ export function App(): JSX.Element {
       />
       <Hero />
       <div className="primary-panel">
-        <EncodeImageTab />
+        <EncodeImageTab storedKeyPair={storedKeyPair} />
       </div>
       {activeModal === "account" ? (
         <Modal title={storedKeyPair ? "Account" : "Sign Up"} onClose={() => setActiveModal(null)}>
@@ -268,12 +269,18 @@ function KeyTab({
   );
 }
 
-function EncodeImageTab(): JSX.Element {
+interface EncodeImageTabProps {
+  storedKeyPair: StoredKeyPair | null;
+}
+
+function EncodeImageTab({ storedKeyPair }: EncodeImageTabProps): JSX.Element {
   const [carrierFile, setCarrierFile] = useState<File | null>(null);
   const [carrierPreviewUrl, setCarrierPreviewUrl] = useState("");
   const [selectedGalleryPath, setSelectedGalleryPath] = useState<string | null>(null);
   const [recipientPublicKey, setRecipientPublicKey] = useState("");
   const [plaintext, setPlaintext] = useState("");
+  const [topText, setTopText] = useState("");
+  const [bottomText, setBottomText] = useState("");
   const [messageReport, setMessageReport] = useState<MessageReport | null>(null);
   const [messageBudgetError, setMessageBudgetError] = useState("");
   const [error, setError] = useState("");
@@ -390,18 +397,52 @@ function EncodeImageTab(): JSX.Element {
     setMessage("");
     resetEncodedImageUrl();
 
-    const validationError = validateEncodeImageForm(carrierFile, recipientPublicKey.trim(), plaintext);
-    if (validationError) {
-      setError(validationError);
+    if (!carrierFile) {
+      setError("A supported image file is required.");
+      return;
+    }
+    if (!isSupportedImageFile(carrierFile)) {
+      setError("A PNG, JPEG, or BMP image is required.");
       return;
     }
 
-    const selectedCarrierFile = carrierFile as File;
-
     try {
-      setMessage("Checking image and message...");
+      setMessage("Подготовка...");
+      const originalBytes = await carrierFile.arrayBuffer();
 
-      const imageBytes = await selectedCarrierFile.arrayBuffer();
+      // Canvas caption step shared by both modes
+      let workingBytes = originalBytes;
+      let captionBlob: Blob | null = null;
+      if (topText.trim() || bottomText.trim()) {
+        setMessage("Наносим подписи...");
+        captionBlob = await renderCaptions(originalBytes, topText, bottomText);
+        if (captionBlob) {
+          workingBytes = await captionBlob.arrayBuffer();
+        }
+      }
+
+      if (storedKeyPair === null) {
+        // MEME-ONLY MODE — no stego, no carrier check
+        const outputBlob = captionBlob ?? new Blob([originalBytes], { type: "image/jpeg" });
+        setEncodedImageUrl(URL.createObjectURL(outputBlob));
+        setEncodedImageName(`stegosavr-${stripExtension(carrierFile.name) || "meme"}.jpg`);
+        setMessage("Мем создан. Скачайте его!");
+        return;
+      }
+
+      // SPECIAL MODE — stego encode
+      if (!recipientPublicKey.trim()) {
+        setError("Recipient public key is required.");
+        setMessage("");
+        return;
+      }
+      if (!plaintext.trim()) {
+        setError("A message is required.");
+        setMessage("");
+        return;
+      }
+
+      setMessage("Checking image and message...");
       const report = await analyzePlaintextMessage(plaintext);
       setMessageReport(report);
       setMessageBudgetError("");
@@ -411,7 +452,7 @@ function EncodeImageTab(): JSX.Element {
         return;
       }
 
-      const carrierReport = await inspectImageCarrier(imageBytes);
+      const carrierReport = await inspectImageCarrier(workingBytes);
       if (!carrierReport.suitable) {
         setError("This image is not suitable for hidden message transport. Choose a larger, more detailed photo.");
         setMessage("");
@@ -420,7 +461,7 @@ function EncodeImageTab(): JSX.Element {
 
       setMessage("Encoding JPEG...");
       const outputBytes = await encodeImageForRecipient({
-        imageBytes,
+        imageBytes: workingBytes,
         recipientPublicKey,
         plaintext,
       });
@@ -428,44 +469,77 @@ function EncodeImageTab(): JSX.Element {
       new Uint8Array(outputBuffer).set(outputBytes);
       const blob = new Blob([outputBuffer], { type: "image/jpeg" });
       setEncodedImageUrl(URL.createObjectURL(blob));
-      setEncodedImageName(`stegosavr-${stripExtension(selectedCarrierFile.name) || "image"}.jpg`);
+      setEncodedImageName(`stegosavr-${stripExtension(carrierFile.name) || "image"}.jpg`);
       setMessage("JPEG encoded. Download it before encoding another image.");
     } catch (caughtError) {
-      setError(getImageErrorMessage(caughtError, "Image encoding failed."));
+      setError(getImageErrorMessage(caughtError, "Encoding failed."));
       setMessage("");
     }
   }
 
   return (
     <section className="workflow" aria-labelledby="encode-image-title">
-      <h2 id="encode-image-title">Encode Image</h2>
+      <h2 id="encode-image-title">{storedKeyPair ? "Создать специальный мем" : "Создать мем"}</h2>
       <p className="helper">
-        Choose a detailed carrier image, paste the recipient's public key, and write a short supported message.
-        Stegosavr uses mytischtschi locally and produces a shareable JPEG.
+        {storedKeyPair
+          ? "Выберите фото-носитель, добавьте подписи, вставьте публичный ключ получателя и напишите скрытое сообщение."
+          : "Выберите фото-носитель и добавьте подписи. Зарегистрируйтесь, чтобы спрятать внутри секретное сообщение."}
       </p>
       <div className="encode-layout">
         <div className="encode-form-column">
           <form className="form-grid" onSubmit={(event) => void handleSubmit(event)}>
             <label>
-              Recipient public key
-              <textarea
-                name="recipientPublicKey"
-                rows={5}
-                value={recipientPublicKey}
-                onChange={(event) => setRecipientPublicKey(event.currentTarget.value)}
+              Текст сверху
+              <input
+                name="topText"
+                type="text"
+                value={topText}
+                placeholder="Подпись сверху (необязательно)"
+                onChange={(event) => {
+                  setTopText(event.currentTarget.value);
+                  resetEncodedImageUrl();
+                }}
               />
             </label>
             <label>
-              Message
-              <textarea
-                name="plaintext"
-                rows={6}
-                value={plaintext}
-                onChange={(event) => handlePlaintextChange(event.currentTarget.value)}
+              Текст снизу
+              <input
+                name="bottomText"
+                type="text"
+                value={bottomText}
+                placeholder="Подпись снизу (необязательно)"
+                onChange={(event) => {
+                  setBottomText(event.currentTarget.value);
+                  resetEncodedImageUrl();
+                }}
               />
             </label>
-            <MessageBudget error={messageBudgetError} plaintext={plaintext} report={messageReport} />
-            <button type="submit">Encode Image</button>
+            {storedKeyPair ? (
+              <>
+                <label>
+                  Recipient public key
+                  <input
+                    name="recipientPublicKey"
+                    type="text"
+                    value={recipientPublicKey}
+                    onChange={(event) => setRecipientPublicKey(event.currentTarget.value)}
+                  />
+                </label>
+                <label>
+                  Message
+                  <textarea
+                    name="plaintext"
+                    rows={6}
+                    value={plaintext}
+                    onChange={(event) => handlePlaintextChange(event.currentTarget.value)}
+                  />
+                </label>
+                <MessageBudget error={messageBudgetError} plaintext={plaintext} report={messageReport} />
+              </>
+            ) : null}
+            <button type="submit">
+              {storedKeyPair ? "Создать специальный мем" : "Создать мем"}
+            </button>
           </form>
           <ErrorMessage message={error} />
           <Notice message={message} />
@@ -731,26 +805,6 @@ function ErrorMessage({ message }: { message: string }): JSX.Element | null {
       {message}
     </p>
   ) : null;
-}
-
-function validateEncodeImageForm(file: File | null, recipientPublicKey: string, plaintext: string): string {
-  if (!file) {
-    return "A supported image file is required.";
-  }
-
-  if (!isSupportedImageFile(file)) {
-    return "A PNG, JPEG, or BMP image is required.";
-  }
-
-  if (!recipientPublicKey) {
-    return "Recipient public key is required.";
-  }
-
-  if (!plaintext.trim()) {
-    return "A message is required.";
-  }
-
-  return "";
 }
 
 function isSupportedImageFile(file: File): boolean {
