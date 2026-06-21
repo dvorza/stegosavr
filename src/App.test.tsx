@@ -3,7 +3,7 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { App } from "./App";
+import { App, parseKeyFromHash } from "./App";
 import { copyText } from "./clipboard";
 import { analyzePlaintextMessage, createKeyPair } from "./crypto";
 
@@ -21,6 +21,40 @@ vi.mock("./crypto", () => ({
 
 const publicKey = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f";
 const protectedPrivateKey = "STEGOSAVR-PRIVATE:v2:salt:nonce:ciphertext";
+
+describe("parseKeyFromHash", () => {
+  afterEach(() => {
+    history.replaceState(null, "", location.pathname + location.search);
+  });
+
+  it("returns the hex key and clears the hash when a valid 64-char hex key is present", () => {
+    const validKey = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f";
+    history.replaceState(null, "", `${location.pathname}#key=${validKey}`);
+    expect(location.hash).toBe(`#key=${validKey}`);
+
+    const result = parseKeyFromHash();
+
+    expect(result).toBe(validKey);
+    expect(location.hash).toBe("");
+  });
+
+  it("returns empty string and leaves the URL unchanged when the key param is malformed", () => {
+    history.replaceState(null, "", `${location.pathname}#key=notahexkey`);
+
+    const result = parseKeyFromHash();
+
+    expect(result).toBe("");
+    expect(location.hash).toBe("#key=notahexkey");
+  });
+
+  it("returns empty string when no hash fragment is present", () => {
+    history.replaceState(null, "", location.pathname);
+
+    const result = parseKeyFromHash();
+
+    expect(result).toBe("");
+  });
+});
 
 describe("App", () => {
   beforeEach(() => {

@@ -17,6 +17,16 @@ import { readStoredKeyPair, saveStoredKeyPair, type StoredKeyPair } from "./stor
 
 type ActiveModal = "account" | "read-image" | null;
 
+export function parseKeyFromHash(): string {
+  const params = new URLSearchParams(location.hash.slice(1));
+  const key = params.get("key") ?? "";
+  if (/^[0-9a-f]{64}$/.test(key)) {
+    history.replaceState(null, "", location.pathname + location.search);
+    return key;
+  }
+  return "";
+}
+
 const ACCEPTED_IMAGE_TYPES = "image/png,image/jpeg,image/bmp";
 const SUPPORTED_IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".bmp"];
 
@@ -25,6 +35,7 @@ export function App(): JSX.Element {
   const [storedKeyPair, setStoredKeyPair] = useState<StoredKeyPair | null>(() => readStoredKeyPair());
   const [keyMessage, setKeyMessage] = useState("");
   const [publicKeyFormat, setPublicKeyFormat] = useState("raw");
+  const [initialRecipientKey] = useState(() => parseKeyFromHash());
 
   return (
     <section className="app-panel">
@@ -34,7 +45,7 @@ export function App(): JSX.Element {
         onReadImageClick={() => setActiveModal("read-image")}
       />
       <div className="primary-panel">
-        <EncodeImageTab storedKeyPair={storedKeyPair} />
+        <EncodeImageTab storedKeyPair={storedKeyPair} initialRecipientKey={initialRecipientKey} />
       </div>
       {activeModal === "account" ? (
         <Modal title={storedKeyPair ? "Account" : "Sign Up"} onClose={() => setActiveModal(null)}>
@@ -150,7 +161,8 @@ function KeyTab({
     const canvas = document.createElement("canvas");
     container.appendChild(canvas);
 
-    QRCode.toCanvas(canvas, storedKeyPair.publicKey, {
+    const magicLinkUrl = `${window.location.origin}${import.meta.env.BASE_URL}#key=${storedKeyPair.publicKey}`;
+    QRCode.toCanvas(canvas, magicLinkUrl, {
       errorCorrectionLevel: "L",
       margin: 1,
       width: 180,
@@ -258,13 +270,14 @@ function KeyTab({
 
 interface EncodeImageTabProps {
   storedKeyPair: StoredKeyPair | null;
+  initialRecipientKey: string;
 }
 
-function EncodeImageTab({ storedKeyPair }: EncodeImageTabProps): JSX.Element {
+function EncodeImageTab({ storedKeyPair, initialRecipientKey }: EncodeImageTabProps): JSX.Element {
   const [carrierFile, setCarrierFile] = useState<File | null>(null);
   const [carrierPreviewUrl, setCarrierPreviewUrl] = useState("");
   const [selectedGalleryPath, setSelectedGalleryPath] = useState<string | null>(null);
-  const [recipientPublicKey, setRecipientPublicKey] = useState("");
+  const [recipientPublicKey, setRecipientPublicKey] = useState(initialRecipientKey);
   const [plaintext, setPlaintext] = useState("");
   const [topText, setTopText] = useState("");
   const [bottomText, setBottomText] = useState("");
