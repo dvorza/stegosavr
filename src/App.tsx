@@ -708,7 +708,6 @@ function ReadImageTab({ storedKeyPair }: ReadImageTabProps): JSX.Element {
   if (!storedKeyPair) {
     return (
       <section className="workflow" aria-labelledby="read-image-title">
-        <h2 id="read-image-title">Read Image</h2>
         <p className="empty-state">Generate your local key before reading image messages addressed to you.</p>
       </section>
     );
@@ -716,7 +715,6 @@ function ReadImageTab({ storedKeyPair }: ReadImageTabProps): JSX.Element {
 
   return (
     <section className="workflow" aria-labelledby="read-image-title">
-      <h2 id="read-image-title">Read Image</h2>
       <p className="helper">Choose an image carrying a hidden message and enter your passphrase to decrypt it locally.</p>
       <form className="form-grid" onSubmit={(event) => void handleSubmit(event)}>
         <label>
