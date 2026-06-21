@@ -1,0 +1,28 @@
+[package]
+name = "mytischtschi"
+version = "0.1.0"
+edition = "2024"
+description = "Encrypted image steganography that survives messenger recompression"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "bmp"] }
+reed-solomon = "0.2"
+dryoc = "0.8"
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+clap = { version = "4", features = ["derive"] }
+anyhow = "1"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2"
+js-sys = "0.3"
+serde-wasm-bindgen = "0.6"
+getrandom = { version = "0.3", features = ["wasm_js"] }
+
+[dev-dependencies]
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "bmp"] }

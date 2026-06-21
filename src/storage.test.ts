@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { hasStoredKeyPair, readStoredKeyPair, saveStoredKeyPair, type KeyStorage } from "./storage";
 
+const publicKey = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f";
+
 function createMemoryStorage(): KeyStorage {
   const values = new Map<string, string>();
 
@@ -20,16 +22,46 @@ describe("key storage", () => {
 
     saveStoredKeyPair(
       {
-        publicKey: "STEGOSAVR-PUBLIC:v1:abc",
-        protectedPrivateKey: "STEGOSAVR-PRIVATE:v1:salt:nonce:ciphertext",
+        publicKey,
+        protectedPrivateKey: "STEGOSAVR-PRIVATE:v2:salt:nonce:ciphertext",
       },
       storage,
     );
 
     expect(readStoredKeyPair(storage)).toEqual({
-      publicKey: "STEGOSAVR-PUBLIC:v1:abc",
-      protectedPrivateKey: "STEGOSAVR-PRIVATE:v1:salt:nonce:ciphertext",
+      publicKey,
+      protectedPrivateKey: "STEGOSAVR-PRIVATE:v2:salt:nonce:ciphertext",
     });
     expect(hasStoredKeyPair(storage)).toBe(true);
+  });
+
+  it("ignores old private-key envelopes", () => {
+    const storage = createMemoryStorage();
+
+    saveStoredKeyPair(
+      {
+        publicKey,
+        protectedPrivateKey: "STEGOSAVR-PRIVATE:v1:salt:nonce:ciphertext",
+      },
+      storage,
+    );
+
+    expect(readStoredKeyPair(storage)).toBeNull();
+    expect(hasStoredKeyPair(storage)).toBe(false);
+  });
+
+  it("ignores legacy Stegosavr public key envelopes", () => {
+    const storage = createMemoryStorage();
+
+    saveStoredKeyPair(
+      {
+        publicKey: ["STEGOSAVR", "PUBLIC:v1:abc"].join("-"),
+        protectedPrivateKey: "STEGOSAVR-PRIVATE:v2:salt:nonce:ciphertext",
+      },
+      storage,
+    );
+
+    expect(readStoredKeyPair(storage)).toBeNull();
+    expect(hasStoredKeyPair(storage)).toBe(false);
   });
 });

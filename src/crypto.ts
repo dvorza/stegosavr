@@ -1,13 +1,14 @@
 import initCrypto, {
-  decryptMessage,
-  encryptMessage,
-  generateKeyPair,
+  analyzeStegosavrMessage,
+  decodeImage,
+  encodeImage,
+  generateStegosavrKeyPair,
+  inspectStegosavrCarrier,
+  stegosavrMessageLimits,
 } from "./wasm/stegosavr_crypto";
 import { normalizePublicKeyInput } from "./mnemonic/public-key";
 import { getRandomBytes } from "./random";
-import { normalizeEncryptedMessageInput } from "./styled/messages";
 
-const KEY_RANDOM_BYTES = 32;
 const SALT_RANDOM_BYTES = 16;
 const NONCE_RANDOM_BYTES = 12;
 
@@ -18,15 +19,36 @@ export interface GeneratedKeyPair {
   protectedPrivateKey: string;
 }
 
-export interface EncryptRequest {
+export interface MessageLimits {
+  english: number;
+  russian: number;
+}
+
+export interface MessageReport {
+  alphabet: "english" | "russian";
+  charCount: number;
+  maxChars: number;
+  fits: boolean;
+}
+
+export interface CarrierReport {
+  width: number;
+  height: number;
+  symbolErrors: number;
+  correctableSymbolErrors: number;
+  suitable: boolean;
+}
+
+export interface EncodeImageRequest {
+  imageBytes: ArrayBuffer | Uint8Array;
   recipientPublicKey: string;
   plaintext: string;
 }
 
-export interface DecryptRequest {
+export interface ReadImageMessageRequest {
+  imageBytes: ArrayBuffer | Uint8Array;
   protectedPrivateKey: string;
   passphrase: string;
-  encryptedMessage: string;
 }
 
 export async function ensureCryptoReady(): Promise<void> {
@@ -36,9 +58,8 @@ export async function ensureCryptoReady(): Promise<void> {
 
 export async function createKeyPair(passphrase: string): Promise<GeneratedKeyPair> {
   await ensureCryptoReady();
-  const json = generateKeyPair(
+  const json = generateStegosavrKeyPair(
     passphrase,
-    getRandomBytes(KEY_RANDOM_BYTES),
     getRandomBytes(SALT_RANDOM_BYTES),
     getRandomBytes(NONCE_RANDOM_BYTES),
   );
@@ -46,27 +67,39 @@ export async function createKeyPair(passphrase: string): Promise<GeneratedKeyPai
   return parseGeneratedKeyPair(json);
 }
 
-export async function encryptForRecipient(request: EncryptRequest): Promise<string> {
+export async function getMessageLimits(): Promise<MessageLimits> {
+  await ensureCryptoReady();
+
+  return parseJson<MessageLimits>(stegosavrMessageLimits(), "message limits");
+}
+
+export async function analyzePlaintextMessage(plaintext: string): Promise<MessageReport> {
+  await ensureCryptoReady();
+
+  return parseJson<MessageReport>(analyzeStegosavrMessage(plaintext), "message analysis");
+}
+
+export async function inspectImageCarrier(imageBytes: ArrayBuffer | Uint8Array): Promise<CarrierReport> {
+  await ensureCryptoReady();
+
+  return parseJson<CarrierReport>(inspectStegosavrCarrier(toUint8Array(imageBytes)), "carrier inspection");
+}
+
+export async function encodeImageForRecipient(request: EncodeImageRequest): Promise<Uint8Array> {
   await ensureCryptoReady();
   const recipientPublicKey = normalizePublicKeyInput(request.recipientPublicKey);
 
-  return encryptMessage(
-    recipientPublicKey,
-    request.plaintext,
-    getRandomBytes(KEY_RANDOM_BYTES),
-    getRandomBytes(NONCE_RANDOM_BYTES),
-  );
+  return encodeImage(toUint8Array(request.imageBytes), recipientPublicKey, request.plaintext);
 }
 
-export async function decryptStoredMessage(request: DecryptRequest): Promise<string> {
+export async function readMessageFromImage(request: ReadImageMessageRequest): Promise<string> {
   await ensureCryptoReady();
-  const encryptedMessage = normalizeEncryptedMessageInput(request.encryptedMessage);
 
-  return decryptMessage(request.protectedPrivateKey, request.passphrase, encryptedMessage);
+  return decodeImage(toUint8Array(request.imageBytes), request.protectedPrivateKey, request.passphrase);
 }
 
 export function parseGeneratedKeyPair(json: string): GeneratedKeyPair {
-  const parsed = JSON.parse(json) as Partial<GeneratedKeyPair>;
+  const parsed = parseJson<Partial<GeneratedKeyPair>>(json, "generated key pair");
 
   if (!parsed.publicKey || !parsed.protectedPrivateKey) {
     throw new Error("WASM key generation returned an invalid key pair.");
@@ -76,4 +109,16 @@ export function parseGeneratedKeyPair(json: string): GeneratedKeyPair {
     publicKey: parsed.publicKey,
     protectedPrivateKey: parsed.protectedPrivateKey,
   };
+}
+
+function parseJson<T>(json: string, label: string): T {
+  try {
+    return JSON.parse(json) as T;
+  } catch {
+    throw new Error(`WASM returned invalid ${label}.`);
+  }
+}
+
+function toUint8Array(bytes: ArrayBuffer | Uint8Array): Uint8Array {
+  return bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
 }

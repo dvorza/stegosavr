@@ -1,5 +1,7 @@
 const PUBLIC_KEY_STORAGE_KEY = "stegosavr.publicKey";
 const PROTECTED_PRIVATE_KEY_STORAGE_KEY = "stegosavr.protectedPrivateKey";
+const PROTECTED_PRIVATE_KEY_PREFIX = "STEGOSAVR-PRIVATE:v2:";
+const PUBLIC_KEY_HEX_LENGTH = 64;
 
 export interface StoredKeyPair {
   publicKey: string;
@@ -15,11 +17,11 @@ export function readStoredKeyPair(storage: KeyStorage = localStorage): StoredKey
   const publicKey = storage.getItem(PUBLIC_KEY_STORAGE_KEY);
   const protectedPrivateKey = storage.getItem(PROTECTED_PRIVATE_KEY_STORAGE_KEY);
 
-  if (!publicKey || !protectedPrivateKey) {
+  if (!isCompatibleStoredKeyPair(publicKey, protectedPrivateKey)) {
     return null;
   }
 
-  return { publicKey, protectedPrivateKey };
+  return { publicKey: publicKey as string, protectedPrivateKey: protectedPrivateKey as string };
 }
 
 export function saveStoredKeyPair(keyPair: StoredKeyPair, storage: KeyStorage = localStorage): void {
@@ -29,4 +31,13 @@ export function saveStoredKeyPair(keyPair: StoredKeyPair, storage: KeyStorage = 
 
 export function hasStoredKeyPair(storage: KeyStorage = localStorage): boolean {
   return readStoredKeyPair(storage) !== null;
+}
+
+function isCompatibleStoredKeyPair(publicKey: string | null, protectedPrivateKey: string | null): boolean {
+  return Boolean(
+    publicKey !== null &&
+      /^[0-9a-fA-F]+$/.test(publicKey) &&
+      publicKey.length === PUBLIC_KEY_HEX_LENGTH &&
+      protectedPrivateKey?.startsWith(PROTECTED_PRIVATE_KEY_PREFIX),
+  );
 }

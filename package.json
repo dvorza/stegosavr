@@ -1,7 +1,7 @@
 {
   "name": "stegosavr",
-  "version": "1.0.0",
-  "description": "A small vanilla TypeScript single page app.",
+  "version": "0.0.1dfdd",
+  "description": "A browser-only React image transport app.",
   "repository": {
     "type": "git",
     "url": "git@github.com-dvorza:dvorza/stegosavr.git"
@@ -12,16 +12,29 @@
   "scripts": {
     "dev": "npm run build:wasm && vite",
     "build": "npm run build:wasm && tsc && vite build",
-    "build:wasm": "wasm-pack build wasm-crypto --target web --out-dir ../src/wasm --release",
+    "build:wasm": "PATH=\"$HOME/.cargo/bin:$PATH\" wasm-pack build wasm-crypto --target web --out-dir ../src/wasm --release",
     "preview": "vite preview",
     "test": "npm run test:wasm && npm run build:wasm && vitest run",
-    "test:wasm": "cargo test --manifest-path wasm-crypto/Cargo.toml",
+    "test:wasm": "PATH=\"$HOME/.cargo/bin:$PATH\" cargo test --manifest-path wasm-crypto/Cargo.toml",
     "test:watch": "vitest"
   },
   "devDependencies": {
+    "@types/qrcode": "^1.5.5",
     "typescript": "^6.0.3",
     "vite": "^8.0.16",
     "vitest": "^4.1.9",
     "wasm-pack": "^0.15.0"
+  },
+  "dependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.2",
+    "jsdom": "^29.1.1",
+    "qrcode": "^1.5.4",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
   }
 }

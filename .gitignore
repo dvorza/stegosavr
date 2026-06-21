@@ -1,11 +1,15 @@
 node_modules
 dist
 coverage
+docker/
+.dockerignore
 wasm-crypto/target
 .DS_Store
+# IDEs and Agents
 
-#IDE, AI, VM
 .claude/
-.dockerignore
 .idea/
-docker/
+
+# Chrome extension build artifacts
+extensions/chrome/dist
+extensions/chrome/src/wasm

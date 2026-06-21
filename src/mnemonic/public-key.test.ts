@@ -9,28 +9,37 @@ import {
   parseRawPublicKeyBytes,
 } from "./public-key";
 import { decodeGrammarPublicKey } from "./grammar-theme";
+import { birthdayToastRuTheme } from "./birthday-toast-ru";
+import type { GrammarThemeProfile } from "./grammar-theme";
+import { lifeWishRuTheme } from "./life-wish-ru";
 import { solemnKitRuTheme } from "./solemn-kit-ru";
 
 const publicKeyBytes = new Uint8Array(Array.from({ length: 32 }, (_, index) => index));
 const rawPublicKey = buildRawPublicKey(publicKeyBytes);
+const legacyPublicKey = ["STEGOSAVR", "PUBLIC:v1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"].join("-");
 
 describe("mnemonic public key format", () => {
   it("round-trips raw public key bytes", () => {
     expect([...parseRawPublicKeyBytes(rawPublicKey)]).toEqual([...publicKeyBytes]);
     expect(buildRawPublicKey(publicKeyBytes)).toBe(rawPublicKey);
+    expect(rawPublicKey).toBe("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f");
+    expect(buildRawPublicKey(parseRawPublicKeyBytes(rawPublicKey.toUpperCase()))).toBe(rawPublicKey);
   });
 
   it("lists raw, token-grid, and grammar display formats", () => {
     expect(listPublicKeyDisplayFormats()).toEqual([
-      { id: "raw", label: "Raw STEGOSAVR key" },
+      { id: "raw", label: "Raw mytischtschi key" },
       { id: "standard", label: "Standard mnemonic" },
       { id: "vegetables", label: "Vegetables mnemonic" },
       { id: "solemn-kit-ru", label: "Торжественный комплект" },
+      { id: "birthday-toast-ru", label: "Поздравление с днем рождения" },
+      { id: "life-wish-ru", label: "Пожелание неповторимого" },
     ]);
   });
 
   it("keeps raw public key formatting canonical", () => {
     expect(formatPublicKey(rawPublicKey, "raw")).toBe(rawPublicKey);
+    expect(formatPublicKey(rawPublicKey.toUpperCase(), "raw")).toBe(rawPublicKey);
   });
 
   it("encodes and decodes a standard mnemonic phrase", () => {
@@ -51,7 +60,26 @@ describe("mnemonic public key format", () => {
     const text = formatPublicKey(rawPublicKey, "solemn-kit-ru");
 
     expect(text.startsWith(solemnKitRuTheme.marker)).toBe(true);
-    expect(countGrammarPairs(text)).toBe(36);
+    expect(countGrammarPairs(text, solemnKitRuTheme)).toBe(36);
+    expect(decodeGrammarPublicKey(text)).toBe(rawPublicKey);
+  });
+
+  it("encodes and decodes a birthday greeting grammar text", () => {
+    const text = formatPublicKey(rawPublicKey, "birthday-toast-ru");
+
+    expect(text.startsWith(birthdayToastRuTheme.marker)).toBe(true);
+    expect(text).toContain("С днем рождения!");
+    expect(countGrammarPairs(text, birthdayToastRuTheme)).toBe(36);
+    expect(decodeGrammarPublicKey(text)).toBe(rawPublicKey);
+  });
+
+  it("encodes and decodes a life wish grammar text", () => {
+    const text = formatPublicKey(rawPublicKey, "life-wish-ru");
+
+    expect(text.startsWith(lifeWishRuTheme.marker)).toBe(true);
+    expect(text).toContain("Пусть будет в жизни все");
+    expect(text).toContain("НЕПОВТОРИМОЕ");
+    expect(countGrammarPairs(text, lifeWishRuTheme)).toBe(36);
     expect(decodeGrammarPublicKey(text)).toBe(rawPublicKey);
   });
 
@@ -59,10 +87,13 @@ describe("mnemonic public key format", () => {
     expect(normalizePublicKeyInput(rawPublicKey)).toBe(rawPublicKey);
     expect(normalizePublicKeyInput(encodeMnemonicPublicKey(rawPublicKey, "standard"))).toBe(rawPublicKey);
     expect(normalizePublicKeyInput(formatPublicKey(rawPublicKey, "solemn-kit-ru"))).toBe(rawPublicKey);
+    expect(normalizePublicKeyInput(formatPublicKey(rawPublicKey, "birthday-toast-ru"))).toBe(rawPublicKey);
+    expect(normalizePublicKeyInput(formatPublicKey(rawPublicKey, "life-wish-ru"))).toBe(rawPublicKey);
   });
 
   it("rejects unsupported recipient public key input after trying registered codecs", () => {
     expect(() => normalizePublicKeyInput("not a key, not a theme")).toThrow("could not be decoded");
+    expect(() => normalizePublicKeyInput(legacyPublicKey)).toThrow("could not be decoded");
   });
 
   it("rejects a phrase with a mistyped token", () => {
@@ -100,11 +131,23 @@ describe("mnemonic public key format", () => {
 
     expect(() => decodeGrammarPublicKey(text)).toThrow("checksum");
   });
+
+  it("rejects birthday greeting text with a checksum mismatch", () => {
+    const text = formatPublicKey(rawPublicKey, "birthday-toast-ru").replace("бодрая встреча", "верная встреча");
+
+    expect(() => decodeGrammarPublicKey(text)).toThrow("checksum");
+  });
+
+  it("rejects life wish text with a checksum mismatch", () => {
+    const text = formatPublicKey(rawPublicKey, "life-wish-ru").replace("ласковый луч", "бережный луч");
+
+    expect(() => decodeGrammarPublicKey(text)).toThrow("checksum");
+  });
 });
 
-function countGrammarPairs(text: string): number {
-  const adjectiveValues = new Set(solemnKitRuTheme.adjectives);
-  const nounValues = new Set(solemnKitRuTheme.nouns);
+function countGrammarPairs(text: string, theme: GrammarThemeProfile): number {
+  const adjectiveValues = new Set(theme.adjectives);
+  const nounValues = new Set(theme.nouns);
   const words = text.toLocaleLowerCase("ru").match(/\p{L}+/gu) ?? [];
   let count = 0;
 
