@@ -184,7 +184,7 @@ function KeyTab({
 
   async function handleCopy(): Promise<void> {
     try {
-      await copyText(selectedPublicKey);
+      await copyText(storedKeyPair?.publicKey ?? "");
       onKeyMessageChange("Public key copied.");
     } catch {
       onKeyMessageChange("Copy failed. Select the text and copy it manually.");

@@ -10,9 +10,26 @@ export async function copyText(
     throw new Error("There is no text to copy.");
   }
 
-  if (!clipboard?.writeText) {
-    throw new Error("Clipboard API is unavailable.");
+  if (clipboard?.writeText) {
+    try {
+      await clipboard.writeText(text);
+      return;
+    } catch {
+      // Fall through to execCommand fallback below.
+    }
   }
 
-  await clipboard.writeText(text);
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+  textarea.select();
+
+  const succeeded = document.execCommand("copy");
+  document.body.removeChild(textarea);
+
+  if (!succeeded) {
+    throw new Error("Copy failed.");
+  }
 }
