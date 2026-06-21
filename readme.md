@@ -5,20 +5,20 @@ Vite, TypeScript, plain CSS, Vitest, Rust, and WebAssembly.
 
 The app lets a user:
 
-- generate a local image transport key pair protected by a passphrase;
+- create a local Account from the header by generating an image transport key pair protected by a passphrase;
 - store the public key and protected private key in browser `localStorage`;
 - copy the public key as a raw key, token-grid mnemonic phrase, or grammar mnemonic text;
 - encode a short plaintext message into a carrier image for another user's public key;
 - download the encoded result as a JPEG image;
-- read and decrypt a hidden message from an encoded image with the stored private key and passphrase.
+- open Read Image from the header after local key creation and decrypt a hidden message with the stored private key and passphrase.
 
 Stegosavr no longer exposes text-only encryption or decryption tabs. Image
-transport is the product surface.
+transport is the product surface, with Encode Image as the primary screen.
 
 ## Public Key Formats
 
 The raw native `mytischtschi` public hex key is the default display option. The
-key page also offers reversible mnemonic display formats that encode the same
+Account modal also offers reversible mnemonic display formats that encode the same
 32-byte public key material used by the image transport engine.
 
 Token-grid formats use fixed word and emoji slots:
@@ -55,16 +55,18 @@ corrupted phrases are rejected before image encoding.
 
 ## Image Transport
 
-The `Encode Image` tab accepts a carrier image, recipient public key, and
+The primary `Encode Image` screen accepts a carrier image, recipient public key, and
 plaintext message. The app shows the detected alphabet, current character count,
 maximum character count, and remaining character budget while the message is
 being written. It validates the message and carrier locally, then uses the
 vendored `mytischtschi` engine to encrypt and embed the message. Successful
 encoding produces a JPEG download.
 
-The `Read Image` tab accepts an encoded image and the passphrase for the stored
-local key. The app unlocks the protected private key locally and uses
-`mytischtschi` to extract and decrypt the hidden message.
+The header shows `Sign Up` until a local key exists. After key creation it shows
+`Account` and reveals `Read Image`. The `Read Image` modal accepts an encoded
+image and the passphrase for the stored local key. The app unlocks the protected
+private key locally and uses `mytischtschi` to extract and decrypt the hidden
+message.
 
 Supported carrier inputs follow the image formats supported by `mytischtschi`,
 including JPEG, PNG, and BMP. Encoded output is JPEG.

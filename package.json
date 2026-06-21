@@ -1,6 +1,6 @@
 {
   "name": "stegosavr",
-  "version": "0.0.1",
+  "version": "0.0.1dfdd",
   "description": "A browser-only React image transport app.",
   "repository": {
     "type": "git",

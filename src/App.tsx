@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { FormEvent, JSX } from "react";
 import QRCode from "qrcode";
 import { copyText } from "./clipboard";
@@ -10,26 +10,34 @@ import {
   readMessageFromImage,
   type MessageReport,
 } from "./crypto";
+import { GALLERY_IMAGES } from "./gallery-images";
 import { formatPublicKey, listPublicKeyDisplayFormats } from "./mnemonic/public-key";
 import { readStoredKeyPair, saveStoredKeyPair, type StoredKeyPair } from "./storage";
 
-type Tab = "key" | "encode-image" | "read-image";
+type ActiveModal = "account" | "read-image" | null;
 
 const ACCEPTED_IMAGE_TYPES = "image/png,image/jpeg,image/bmp";
 const SUPPORTED_IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".bmp"];
 
 export function App(): JSX.Element {
-  const [activeTab, setActiveTab] = useState<Tab>("key");
+  const [activeModal, setActiveModal] = useState<ActiveModal>(null);
   const [storedKeyPair, setStoredKeyPair] = useState<StoredKeyPair | null>(() => readStoredKeyPair());
   const [keyMessage, setKeyMessage] = useState("");
   const [publicKeyFormat, setPublicKeyFormat] = useState("raw");
 
   return (
     <section className="app-panel" aria-labelledby="app-title">
+      <SiteHeader
+        hasStoredKey={storedKeyPair !== null}
+        onAccountClick={() => setActiveModal("account")}
+        onReadImageClick={() => setActiveModal("read-image")}
+      />
       <Hero />
-      <TabNav activeTab={activeTab} onSelect={setActiveTab} />
-      <div className="tab-panel">
-        {activeTab === "key" ? (
+      <div className="primary-panel">
+        <EncodeImageTab />
+      </div>
+      {activeModal === "account" ? (
+        <Modal title={storedKeyPair ? "Account" : "Sign Up"} onClose={() => setActiveModal(null)}>
           <KeyTab
             keyMessage={keyMessage}
             publicKeyFormat={publicKeyFormat}
@@ -38,11 +46,38 @@ export function App(): JSX.Element {
             onPublicKeyFormatChange={setPublicKeyFormat}
             onStoredKeyPairChange={setStoredKeyPair}
           />
-        ) : null}
-        {activeTab === "encode-image" ? <EncodeImageTab /> : null}
-        {activeTab === "read-image" ? <ReadImageTab storedKeyPair={storedKeyPair} /> : null}
-      </div>
+        </Modal>
+      ) : null}
+      {activeModal === "read-image" && storedKeyPair ? (
+        <Modal title="Read Image" onClose={() => setActiveModal(null)}>
+          <ReadImageTab storedKeyPair={storedKeyPair} />
+        </Modal>
+      ) : null}
     </section>
+  );
+}
+
+interface SiteHeaderProps {
+  hasStoredKey: boolean;
+  onAccountClick: () => void;
+  onReadImageClick: () => void;
+}
+
+function SiteHeader({ hasStoredKey, onAccountClick, onReadImageClick }: SiteHeaderProps): JSX.Element {
+  return (
+    <header className="site-header" aria-label="Site header">
+      <div className="site-brand">Остапа несло</div>
+      <div className="header-actions">
+        <button type="button" onClick={onAccountClick}>
+          {hasStoredKey ? "Account" : "Sign Up"}
+        </button>
+        {hasStoredKey ? (
+          <button type="button" onClick={onReadImageClick}>
+            Read Image
+          </button>
+        ) : null}
+      </div>
+    </header>
   );
 }
 
@@ -59,31 +94,38 @@ function Hero(): JSX.Element {
   );
 }
 
-interface TabNavProps {
-  activeTab: Tab;
-  onSelect: (tab: Tab) => void;
+interface ModalProps {
+  children: JSX.Element;
+  onClose: () => void;
+  title: string;
 }
 
-function TabNav({ activeTab, onSelect }: TabNavProps): JSX.Element {
+function Modal({ children, onClose, title }: ModalProps): JSX.Element {
+  const titleId = useId();
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent): void {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
   return (
-    <nav className="tabs" aria-label="Image message workflows">
-      <TabButton activeTab={activeTab} label="My key" tab="key" onSelect={onSelect} />
-      <TabButton activeTab={activeTab} label="Encode Image" tab="encode-image" onSelect={onSelect} />
-      <TabButton activeTab={activeTab} label="Read Image" tab="read-image" onSelect={onSelect} />
-    </nav>
-  );
-}
-
-interface TabButtonProps extends TabNavProps {
-  label: string;
-  tab: Tab;
-}
-
-function TabButton({ activeTab, label, tab, onSelect }: TabButtonProps): JSX.Element {
-  return (
-    <button className="tab-button" type="button" aria-selected={activeTab === tab} onClick={() => onSelect(tab)}>
-      {label}
-    </button>
+    <div className="modal-backdrop" data-testid="modal-backdrop">
+      <section className="modal-panel" role="dialog" aria-modal="true" aria-labelledby={titleId}>
+        <div className="modal-header">
+          <h2 id={titleId}>{title}</h2>
+          <button className="modal-close" type="button" aria-label={`Close ${title}`} onClick={onClose}>
+            Close
+          </button>
+        </div>
+        <div className="modal-body">{children}</div>
+      </section>
+    </div>
   );
 }
 
@@ -164,10 +206,10 @@ function KeyTab({
   if (!storedKeyPair) {
     return (
       <section className="workflow" aria-labelledby="key-title">
-        <h2 id="key-title">Create your local key</h2>
+        <h3 id="key-title">Create your local key</h3>
         <p className="helper">
-          Your private key is protected with this passphrase before it is saved in localStorage. There is no
-          recovery if you forget it.
+          Sign Up creates a local browser account for image messages. Your private key is protected with this
+          passphrase before it is saved in localStorage, and there is no recovery if you forget it.
         </p>
         <form className="form-grid" onSubmit={(event) => void handleSubmit(event)}>
           <label>
@@ -190,7 +232,7 @@ function KeyTab({
 
   return (
     <section className="workflow" aria-labelledby="key-title">
-      <h2 id="key-title">Your public key</h2>
+      <h3 id="key-title">Your public key</h3>
       <p className="helper">
         Share this public key with someone who wants to encode an image message for you. Key replacement,
         private-key export, and private-key import are intentionally unavailable in this MVP.
@@ -228,6 +270,8 @@ function KeyTab({
 
 function EncodeImageTab(): JSX.Element {
   const [carrierFile, setCarrierFile] = useState<File | null>(null);
+  const [carrierPreviewUrl, setCarrierPreviewUrl] = useState("");
+  const [selectedGalleryPath, setSelectedGalleryPath] = useState<string | null>(null);
   const [recipientPublicKey, setRecipientPublicKey] = useState("");
   const [plaintext, setPlaintext] = useState("");
   const [messageReport, setMessageReport] = useState<MessageReport | null>(null);
@@ -247,6 +291,13 @@ function EncodeImageTab(): JSX.Element {
     });
   }
 
+  function resetCarrierPreview(): void {
+    setCarrierPreviewUrl((currentUrl) => {
+      URL.revokeObjectURL(currentUrl);
+      return "";
+    });
+  }
+
   useEffect(
     () => () => {
       if (encodedImageUrl) {
@@ -254,6 +305,13 @@ function EncodeImageTab(): JSX.Element {
       }
     },
     [encodedImageUrl],
+  );
+
+  useEffect(
+    () => () => {
+      URL.revokeObjectURL(carrierPreviewUrl);
+    },
+    [carrierPreviewUrl],
   );
 
   useEffect(() => {
@@ -303,6 +361,27 @@ function EncodeImageTab(): JSX.Element {
     setError("");
     setMessage("");
     resetEncodedImageUrl();
+  }
+
+  async function handleGallerySelect(path: string, filename: string): Promise<void> {
+    setSelectedGalleryPath(path);
+    setError("");
+    setMessage("");
+    resetEncodedImageUrl();
+
+    try {
+      const response = await fetch(path);
+      const blob = await response.blob();
+      const file = new File([blob], filename, { type: blob.type });
+      setCarrierFile(file);
+      setCarrierPreviewUrl((currentUrl) => {
+        URL.revokeObjectURL(currentUrl);
+        return path;
+      });
+    } catch {
+      setError("Failed to load gallery image.");
+      setSelectedGalleryPath(null);
+    }
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
@@ -364,46 +443,110 @@ function EncodeImageTab(): JSX.Element {
         Choose a detailed carrier image, paste the recipient's public key, and write a short supported message.
         Stegosavr uses mytischtschi locally and produces a shareable JPEG.
       </p>
-      <form className="form-grid" onSubmit={(event) => void handleSubmit(event)}>
-        <label>
-          Carrier image
-          <input
-            name="carrierImage"
-            type="file"
-            accept={ACCEPTED_IMAGE_TYPES}
-            onChange={(event) => {
-              setCarrierFile(event.currentTarget.files?.[0] ?? null);
-              setError("");
-              setMessage("");
-              resetEncodedImageUrl();
-            }}
-          />
-        </label>
-        <label>
-          Recipient public key
-          <textarea
-            name="recipientPublicKey"
-            rows={5}
-            value={recipientPublicKey}
-            onChange={(event) => setRecipientPublicKey(event.currentTarget.value)}
-          />
-        </label>
-        <label>
-          Message
-          <textarea
-            name="plaintext"
-            rows={6}
-            value={plaintext}
-            onChange={(event) => handlePlaintextChange(event.currentTarget.value)}
-          />
-        </label>
-        <MessageBudget error={messageBudgetError} plaintext={plaintext} report={messageReport} />
-        <button type="submit">Encode Image</button>
-      </form>
-      <ErrorMessage message={error} />
-      <Notice message={message} />
-      <EncodedImageOutput imageName={encodedImageName} imageUrl={encodedImageUrl} />
+      <div className="encode-layout">
+        <div className="encode-form-column">
+          <form className="form-grid" onSubmit={(event) => void handleSubmit(event)}>
+            <label>
+              Carrier image
+              <input
+                name="carrierImage"
+                type="file"
+                accept={ACCEPTED_IMAGE_TYPES}
+                onChange={(event) => {
+                  const file = event.currentTarget.files?.[0] ?? null;
+                  setCarrierFile(file);
+                  setSelectedGalleryPath(null);
+                  setError("");
+                  setMessage("");
+                  resetEncodedImageUrl();
+                  if (file) {
+                    setCarrierPreviewUrl((currentUrl) => {
+                      URL.revokeObjectURL(currentUrl);
+                      return URL.createObjectURL(file);
+                    });
+                  } else {
+                    resetCarrierPreview();
+                  }
+                }}
+              />
+            </label>
+            <label>
+              Recipient public key
+              <textarea
+                name="recipientPublicKey"
+                rows={5}
+                value={recipientPublicKey}
+                onChange={(event) => setRecipientPublicKey(event.currentTarget.value)}
+              />
+            </label>
+            <label>
+              Message
+              <textarea
+                name="plaintext"
+                rows={6}
+                value={plaintext}
+                onChange={(event) => handlePlaintextChange(event.currentTarget.value)}
+              />
+            </label>
+            <MessageBudget error={messageBudgetError} plaintext={plaintext} report={messageReport} />
+            <button type="submit">Encode Image</button>
+          </form>
+          <ErrorMessage message={error} />
+          <Notice message={message} />
+          <EncodedImageOutput imageName={encodedImageName} imageUrl={encodedImageUrl} />
+        </div>
+        <CarrierPreview previewUrl={carrierPreviewUrl} />
+      </div>
+      <CarrierGallery
+        selectedPath={selectedGalleryPath}
+        onSelect={(path, filename) => void handleGallerySelect(path, filename)}
+      />
     </section>
+  );
+}
+
+interface CarrierPreviewProps {
+  previewUrl: string;
+}
+
+function CarrierPreview({ previewUrl }: CarrierPreviewProps): JSX.Element {
+  return (
+    <div className="carrier-preview-panel">
+      {previewUrl ? (
+        <img className="carrier-preview-image" src={previewUrl} alt="Selected carrier image preview" />
+      ) : (
+        <div className="carrier-preview-placeholder">
+          Select a carrier image from the gallery or upload your own
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface CarrierGalleryProps {
+  selectedPath: string | null;
+  onSelect: (path: string, filename: string) => void;
+}
+
+function CarrierGallery({ selectedPath, onSelect }: CarrierGalleryProps): JSX.Element {
+  return (
+    <div className="carrier-gallery">
+      <p className="carrier-gallery-label">Sample carrier images</p>
+      <div className="carrier-gallery-grid">
+        {GALLERY_IMAGES.map((image) => (
+          <button
+            key={image.path}
+            type="button"
+            className={`carrier-thumbnail-btn${image.path === selectedPath ? " carrier-thumbnail-btn--selected" : ""}`}
+            aria-label={image.filename}
+            aria-pressed={image.path === selectedPath}
+            onClick={() => onSelect(image.path, image.filename)}
+          >
+            <img className="carrier-thumbnail-img" src={image.path} alt="" loading="lazy" />
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
